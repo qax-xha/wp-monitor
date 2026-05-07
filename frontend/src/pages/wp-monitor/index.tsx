@@ -1132,7 +1132,7 @@ export default function WpMonitorPage() {
           </div>
           <div className="title-brand">
             <div className="title-row">
-              <div className="title">Wp Monitor</div>
+              <div className="title">Monitor</div>
               {appVersion ? (
                 <span className="title-version-inline" aria-label={`当前版本 v${appVersion}`}>
                   <span className="title-version-inline-text">v{appVersion}</span>
