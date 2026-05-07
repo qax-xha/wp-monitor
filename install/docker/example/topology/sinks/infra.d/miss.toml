@@ -23,3 +23,4 @@ connect = "victorialogs_sink"
 endpoint = "http://127.0.0.1:19429"
 insert_path = "/insert/jsonline"
 flush_interval_secs = 3
+tags = ["wp_stage:miss"]
