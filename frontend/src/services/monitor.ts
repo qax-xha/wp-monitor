@@ -9,10 +9,10 @@ import type {
 } from "../types/monitor";
 
 function normalizeIsoToSecondBoundary(iso: string) {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  d.setMilliseconds(0);
-  return d.toISOString();
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  date.setMilliseconds(0);
+  return date.toISOString();
 }
 
 function normalizeTimeRange(startTime: string, endTime: string) {
@@ -41,10 +41,10 @@ function mergeTimePoints(groups: Array<{ ts: string; value: number }[]>) {
   const merged: Array<{ ts: string; value: number }> = [];
   const seen = new Set<string>();
   groups.forEach((points) => {
-    points.forEach((p) => {
-      if (seen.has(p.ts)) return;
-      seen.add(p.ts);
-      merged.push(p);
+    points.forEach((point) => {
+      if (seen.has(point.ts)) return;
+      seen.add(point.ts);
+      merged.push(point);
     });
   });
   merged.sort((a, b) => new Date(a.ts).getTime() - new Date(b.ts).getTime());
@@ -168,17 +168,17 @@ export async function fetchNodeTimeSeries(
       normalizedEnd,
       safeMaxDataPoints,
     );
-  } catch (e) {
+  } catch (err) {
     const startMs = new Date(normalizedStart).getTime();
     const endMs = new Date(normalizedEnd).getTime();
     const durationMs = endMs - startMs;
     if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || durationMs <= 0) {
-      throw e;
+      throw err;
     }
     // 仅在大窗口失败时回退为分段请求，尽量保持原有性能与行为。
     const fallbackThresholdMs = 24 * 60 * 60 * 1000;
     if (durationMs <= fallbackThresholdMs) {
-      throw e;
+      throw err;
     }
 
     const chunkMs = 7 * 24 * 60 * 60 * 1000;
@@ -204,13 +204,13 @@ export async function fetchNodeTimeSeries(
 
     const merged: NodeTimeSeries = {
       node_id: chunks[0]?.node_id ?? nodeId,
-      log_rate_eps: mergeTimePoints(chunks.map((c) => c.log_rate_eps ?? [])),
-      log_count: mergeTimePoints(chunks.map((c) => c.log_count ?? [])),
+      log_rate_eps: mergeTimePoints(chunks.map((chunk) => chunk.log_rate_eps ?? [])),
+      log_count: mergeTimePoints(chunks.map((chunk) => chunk.log_count ?? [])),
     };
-    const step = chunks.find((c) => typeof c.step_secs === "number")?.step_secs;
+    const step = chunks.find((chunk) => typeof chunk.step_secs === "number")?.step_secs;
     if (typeof step === "number") merged.step_secs = step;
     const rateWindow = chunks.find(
-      (c) => typeof c.rate_window_secs === "number",
+      (chunk) => typeof chunk.rate_window_secs === "number",
     )?.rate_window_secs;
     if (typeof rateWindow === "number") merged.rate_window_secs = rateWindow;
 

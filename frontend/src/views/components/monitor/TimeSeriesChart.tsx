@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import ApexCharts, { type ApexOptions } from 'apexcharts';
-import type { TimePoint } from '../../types/monitor';
+import type { TimePoint } from '../../../types/monitor';
 import { MONITOR_SERIES_PALETTE } from './chartPalette';
 
 interface Props {
@@ -20,9 +20,9 @@ interface Props {
 }
 
 function timeText(ts: string) {
-  const d = new Date(ts);
-  if (Number.isNaN(d.getTime())) return ts;
-  return d.toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit' });
+  const date = new Date(ts);
+  if (Number.isNaN(date.getTime())) return ts;
+  return date.toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit' });
 }
 
 export default function TimeSeriesChart({
@@ -42,14 +42,14 @@ export default function TimeSeriesChart({
 }: Props) {
   const isMulti = Boolean(multiSeries && multiSeries.length > 0);
   const flatPoints = isMulti
-    ? (multiSeries ?? []).flatMap((s) => s.points)
+    ? (multiSeries ?? []).flatMap((seriesItem) => seriesItem.points)
     : points;
   const latest = points[points.length - 1]?.value ?? 0;
   const firstTs = flatPoints[0] ? new Date(flatPoints[0].ts).getTime() : undefined;
   const lastTs = flatPoints[flatPoints.length - 1]
     ? new Date(flatPoints[flatPoints.length - 1].ts).getTime()
     : undefined;
-  const values = flatPoints.map((p) => p.value);
+  const values = flatPoints.map((point) => point.value);
   const valueMin = values.length > 0 ? Math.min(...values) : undefined;
   const valueMax = values.length > 0 ? Math.max(...values) : undefined;
   const computedMinY =
@@ -76,14 +76,14 @@ export default function TimeSeriesChart({
   const series = useMemo(
     () =>
       isMulti
-        ? (multiSeries ?? []).map((s) => ({
-            name: s.name,
-            data: s.points.map((p) => ({ x: new Date(p.ts).getTime(), y: p.value })),
+        ? (multiSeries ?? []).map((seriesItem) => ({
+            name: seriesItem.name,
+            data: seriesItem.points.map((point) => ({ x: new Date(point.ts).getTime(), y: point.value })),
           }))
         : [
             {
               name: title,
-              data: points.map((p) => ({ x: new Date(p.ts).getTime(), y: p.value })),
+              data: points.map((point) => ({ x: new Date(point.ts).getTime(), y: point.value })),
             },
           ],
     [isMulti, multiSeries, points, title],
@@ -92,7 +92,7 @@ export default function TimeSeriesChart({
   const palette = useMemo(() => {
     if (!isMulti) return [color];
     return (multiSeries ?? []).map(
-      (s, idx) => s.color ?? MONITOR_SERIES_PALETTE[idx % MONITOR_SERIES_PALETTE.length],
+      (seriesItem, index) => seriesItem.color ?? MONITOR_SERIES_PALETTE[index % MONITOR_SERIES_PALETTE.length],
     );
   }, [color, isMulti, multiSeries]);
 
@@ -155,9 +155,9 @@ export default function TimeSeriesChart({
           minWidth: 64,
           offsetX: -2,
           style: { colors: '#6b84a8', fontSize: '10px' },
-          formatter: (v) => {
-            if (axisValueFormatter) return axisValueFormatter(Number(v));
-            return valueFormatter ? valueFormatter(Number(v)) : Number(v).toFixed(1);
+          formatter: (value) => {
+            if (axisValueFormatter) return axisValueFormatter(Number(value));
+            return valueFormatter ? valueFormatter(Number(value)) : Number(value).toFixed(1);
           },
         },
       },
@@ -166,13 +166,13 @@ export default function TimeSeriesChart({
         intersect: false,
         followCursor: true,
         x: {
-          formatter: (v) => {
-            const d = new Date(v);
-            return d.toLocaleString('zh-CN', { hour12: false });
+          formatter: (value) => {
+            const date = new Date(value);
+            return date.toLocaleString('zh-CN', { hour12: false });
           },
         },
         y: {
-          formatter: (v) => (valueFormatter ? valueFormatter(Number(v)) : Number(v).toFixed(2)),
+          formatter: (value) => (valueFormatter ? valueFormatter(Number(value)) : Number(value).toFixed(2)),
         },
       },
       legend: {
