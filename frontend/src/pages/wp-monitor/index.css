@@ -130,6 +130,32 @@ body {
     line-height: 1;
 }
 
+.title-row {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
+}
+
+.title-version-inline {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    padding: 3px 8px;
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: 999px;
+    background: rgba(241, 245, 249, 0.72);
+}
+
+.title-version-inline-text {
+    font-size: 10px;
+    line-height: 1;
+    font-weight: 600;
+    letter-spacing: 0.08px;
+    color: #3f547f;
+    white-space: nowrap;
+}
+
 .title-sub {
     font-size: 12px;
     color: #64748b;
@@ -1997,6 +2023,18 @@ body {
 
     .title {
         font-size: 18px;
+    }
+
+    .title-row {
+        gap: 6px;
+    }
+
+    .title-version-inline {
+        padding: 3px 7px;
+    }
+
+    .title-version-inline-text {
+        font-size: 9px;
     }
 
     .toolbar-right {

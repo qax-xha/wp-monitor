@@ -21,6 +21,7 @@ import {
   fetchNodeTimeSeries,
   fetchParseTimeSeries,
   fetchSnapshot,
+  fetchVersion,
 } from "../../services/monitor";
 import type {
   LayerSnapshot,
@@ -167,6 +168,7 @@ export default function WpMonitorPage() {
   const formatCount = useCallback((v: number) => fmtCount(v), []);
   const formatRate2 = useCallback((v: number) => `${v.toFixed(2)} e/s`, []);
 
+  const [appVersion, setAppVersion] = useState("");
   const [snapshot, setSnapshot] = useState<LayerSnapshot | null>(null);
   const [startTime, setStartTime] = useState(() => toIsoByMinutesAgo(5));
   const [endTime, setEndTime] = useState(() => nowWithLagIso());
@@ -319,6 +321,26 @@ export default function WpMonitorPage() {
 
   useEffect(() => {
     void loadSnapshot();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadVersion() {
+      try {
+        const data = await fetchVersion();
+        if (!cancelled) {
+          setAppVersion(data.version);
+        }
+      } catch {
+        if (!cancelled) {
+          setAppVersion("");
+        }
+      }
+    }
+    void loadVersion();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -1109,7 +1131,14 @@ export default function WpMonitorPage() {
             />
           </div>
           <div className="title-brand">
-            <div className="title">Wp Monitor</div>
+            <div className="title-row">
+              <div className="title">Wp Monitor</div>
+              {appVersion ? (
+                <span className="title-version-inline" aria-label={`当前版本 v${appVersion}`}>
+                  <span className="title-version-inline-text">v{appVersion}</span>
+                </span>
+              ) : null}
+            </div>
           </div>
         </div>
         <div className="toolbar-right">

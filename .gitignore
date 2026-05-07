@@ -12,3 +12,7 @@
 
 _gal/.report/
 .run*
+
+# AI
+video-tool/
+.serena/

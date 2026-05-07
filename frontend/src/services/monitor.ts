@@ -5,6 +5,7 @@ import type {
   MissedLogsPage,
   NodeDetail,
   NodeTimeSeries,
+  VersionInfo,
 } from "../types/monitor";
 
 function normalizeIsoToSecondBoundary(iso: string) {
@@ -101,6 +102,14 @@ export async function fetchSnapshot(startTime?: string, endTime?: string) {
   const end = normalizeIsoToSecondBoundary(endTime ?? new Date().toISOString());
   const url = `/api/v1/wp-monitor/layers/snapshot?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}`;
   const data = await requestJson<LayerSnapshot>(url, "snapshot request failed");
+  return data.data;
+}
+
+export async function fetchVersion() {
+  const data = await requestJson<VersionInfo>(
+    "/api/v1/wp-monitor/meta/version",
+    "version request failed",
+  );
   return data.data;
 }
 
