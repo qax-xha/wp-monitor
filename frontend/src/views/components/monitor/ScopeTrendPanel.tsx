@@ -1,5 +1,6 @@
+import { Button, Switch, Tag, Typography } from "antd";
 import TimeSeriesChart from "./TimeSeriesChart";
-import type { NodeTimeSeries, TimePoint } from "../../types/monitor";
+import type { NodeTimeSeries, TimePoint } from "../../../types/monitor";
 
 interface ScopeSeriesLine {
   name: string;
@@ -62,19 +63,10 @@ export default function ScopeTrendPanel({
             </span>
           </span>
         </div>
-        <button
-          className={`toggle-switch ${detailTrendAutoRefresh ? "on" : ""}`}
-          type="button"
-          role="switch"
-          aria-checked={detailTrendAutoRefresh}
-          aria-label="切换范围趋势实时刷新"
-          onClick={onToggleAutoRefresh}
-        >
-          <span className="toggle-switch-label">实时刷新</span>
-          <span className="toggle-switch-track">
-            <span className="toggle-switch-thumb" />
-          </span>
-        </button>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>实时刷新</Typography.Text>
+          <Switch size="small" checked={detailTrendAutoRefresh} onChange={onToggleAutoRefresh} />
+        </span>
       </div>
       {parseMultiSeries.length > 0 && (
         <>
@@ -95,14 +87,9 @@ export default function ScopeTrendPanel({
             >
               点击图例可切换曲线显示
             </div>
-            <button
-              className="mini-btn"
-              type="button"
-              onClick={onShowAll}
-              disabled={hiddenScopeSeriesNames.length === 0}
-            >
+            <Button size="small" onClick={onShowAll} disabled={hiddenScopeSeriesNames.length === 0}>
               全部显示
-            </button>
+            </Button>
           </div>
           <div
             style={{
@@ -115,42 +102,19 @@ export default function ScopeTrendPanel({
             {parseMultiSeries.map((line) => {
               const hidden = hiddenScopeSeriesNames.includes(line.name);
               return (
-                <button
+                <Tag
                   key={line.name}
-                  type="button"
-                  onClick={() => onToggleSeries(line.name)}
+                  color={hidden ? undefined : line.color}
                   style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    color: hidden ? "#94a3b8" : "#4b6386",
-                    fontSize: "12px",
-                    border: "1px solid #dbe5f3",
-                    background: hidden ? "#f8fafc" : "#ffffff",
-                    borderRadius: "999px",
-                    padding: "2px 8px",
                     cursor: "pointer",
-                    opacity: hidden ? 0.65 : 1,
+                    opacity: hidden ? 0.5 : 1,
+                    textDecoration: hidden ? "line-through" : "none",
                   }}
-                  aria-pressed={!hidden}
+                  onClick={() => onToggleSeries(line.name)}
                   title={hidden ? "点击显示该曲线" : "点击隐藏该曲线"}
                 >
-                  <span
-                    style={{
-                      width: "8px",
-                      height: "8px",
-                      borderRadius: "50%",
-                      background: line.color ?? "#2f6df6",
-                    }}
-                  />
-                  <span
-                    style={{
-                      textDecoration: hidden ? "line-through" : "none",
-                    }}
-                  >
-                    {line.name}
-                  </span>
-                </button>
+                  {line.name}
+                </Tag>
               );
             })}
           </div>

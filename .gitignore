@@ -2,6 +2,7 @@
 /target/
 
 # Frontend
+/frontend/dist
 /frontend/node_modules/
 /frontend/.vite/
 /frontend/coverage/
