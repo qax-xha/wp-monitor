@@ -42,12 +42,16 @@ jobs:
         with:
           package_json_file: frontend/package.json
 
+      - name: Verify frontend lockfile
+        run: test -f frontend/pnpm-lock.yaml
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'pnpm'
-          cache-dependency-path: frontend/pnpm-lock.yaml
+          cache-dependency-path: |
+            ./frontend/pnpm-lock.yaml
 
       - name: Build frontend assets
         run: |
@@ -121,12 +125,16 @@ jobs:
         with:
           package_json_file: frontend/package.json
 
+      - name: Verify frontend lockfile
+        run: test -f frontend/pnpm-lock.yaml
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'pnpm'
-          cache-dependency-path: frontend/pnpm-lock.yaml
+          cache-dependency-path: |
+            ./frontend/pnpm-lock.yaml
 
       - name: Build frontend assets
         run: |
