@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Alert, App, Button, Card, Col, DatePicker, Drawer, Flex,
-  Input, InputNumber, Layout, Row, Space, Spin, Switch, Tag, Typography,
+  App, Button, DatePicker, Input, InputNumber, Space, Switch, Typography,
 } from "antd";
 import { ChevronDown } from "lucide-react";
-import antdZhCN from "antd/es/locale/zh_CN";
 import dayjs, { type Dayjs } from "dayjs";
 import "dayjs/locale/zh-cn";
 
@@ -168,7 +166,6 @@ function buildQuickRange(key: string) {
 }
 
 export default function WpMonitorPage() {
-  const formatCount = useCallback((v: number) => fmtCount(v), []);
   const formatRate2 = useCallback((v: number) => `${v.toFixed(2)} e/s`, []);
 
   const [appVersion, setAppVersion] = useState("");
@@ -376,23 +373,6 @@ export default function WpMonitorPage() {
       }
     };
   }, []);
-
-  const nodesCount = useMemo(() => {
-    if (!snapshot) return 0;
-    const parseLogs = snapshot.parses.reduce(
-      (acc, parseItem) => acc + parseItem.logs.length,
-      0,
-    );
-    const sinks = snapshot.sinks.reduce((acc, sinkItem) => acc + sinkItem.sinks.length, 0);
-    return (
-      snapshot.sources.length +
-      snapshot.parses.length +
-      parseLogs +
-      snapshot.sinks.length +
-      sinks +
-      1
-    );
-  }, [snapshot]);
 
   const rateChartPoints = useMemo(
     () => series?.log_rate_eps ?? [],
@@ -1041,20 +1021,6 @@ export default function WpMonitorPage() {
       event.preventDefault();
       setParseSearchOpen(false);
     }
-  }
-
-  function moveParseSelection(delta: number) {
-    if (
-      !parseSearchOpen ||
-      !parseQuery.trim() ||
-      parseSearchFlatItems.length === 0
-    )
-      return;
-    setParseSearchActiveIndex(
-      (prev) =>
-        (prev + delta + parseSearchFlatItems.length) %
-        parseSearchFlatItems.length,
-    );
   }
 
   function onDetailPanelResizeMove(event: PointerEvent) {
