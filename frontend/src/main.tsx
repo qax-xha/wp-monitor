@@ -11,7 +11,7 @@ createRoot(document.getElementById('root')!).render(
     <ConfigProvider
       theme={{
         algorithm: theme.darkAlgorithm,
-        token: { colorPrimary: '#818cf8', borderRadius: 6 },
+        token: { colorPrimary: '#e44d26', borderRadius: 6 },
       }}
       componentSize="middle"
       locale={antdZhCN}

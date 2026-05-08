@@ -1,4 +1,4 @@
-import { Button, Switch, Tag, Typography } from "antd";
+import { Divider, Space, Switch, Typography } from "antd";
 import TimeSeriesChart from "./TimeSeriesChart";
 import type { NodeTimeSeries, TimePoint } from "../../../types/monitor";
 
@@ -18,14 +18,12 @@ interface ScopeTrendPanelProps {
   detailStartTime: string;
   detailEndTime: string;
   onToggleAutoRefresh: () => void;
-  onShowAll: () => void;
   onToggleSeries: (name: string) => void;
   formatRate2: (value: number) => string;
   formatLocalTime: (iso: string) => string;
 }
 
 export default function ScopeTrendPanel({
-  title,
   parseSeriesList,
   parseMultiSeries,
   visibleParseMultiSeries,
@@ -34,7 +32,6 @@ export default function ScopeTrendPanel({
   detailStartTime,
   detailEndTime,
   onToggleAutoRefresh,
-  onShowAll,
   onToggleSeries,
   formatRate2,
   formatLocalTime,
@@ -43,25 +40,24 @@ export default function ScopeTrendPanel({
     <section className="panel card detail-col">
       <div className="panel-head">
         <div className="panel-head-main">
-          <div className="panel-title">{title || "Parse 节点趋势"}</div>
-          <span className="detail-kv-value detail-time-value detail-param-list">
-            <span className="detail-param-item">
-              <span className="detail-param-name">采样间隔</span>
-              <span className="detail-param-data">
-                {parseSeriesList[0]?.step_secs
-                  ? `${parseSeriesList[0].step_secs}s`
-                  : "--"}
-              </span>
-            </span>
-            <span className="detail-param-item">
-              <span className="detail-param-name">统计窗口</span>
-              <span className="detail-param-data">
-                {parseSeriesList[0]?.rate_window_secs
-                  ? `${parseSeriesList[0].rate_window_secs}s`
-                  : "--"}
-              </span>
-            </span>
-          </span>
+          <Typography.Text strong style={{ fontSize: 13, color: "var(--text-sub)" }}>{"节点趋势"}</Typography.Text>
+          <Divider type="vertical" style={{ margin: "0 2px", borderColor: "rgba(228,77,38,0.18)" }} />
+          <Space size={4}>
+            <Typography.Text style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-sub)" }}>采样间隔</Typography.Text>
+            <Typography.Text style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--accent)" }}>
+              {parseSeriesList[0]?.step_secs
+                ? `${parseSeriesList[0].step_secs}s`
+                : "--"}
+            </Typography.Text>
+          </Space>
+          <Space size={4}>
+            <Typography.Text style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-sub)" }}>统计窗口</Typography.Text>
+            <Typography.Text style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--accent)" }}>
+              {parseSeriesList[0]?.rate_window_secs
+                ? `${parseSeriesList[0].rate_window_secs}s`
+                : "--"}
+            </Typography.Text>
+          </Space>
         </div>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>实时刷新</Typography.Text>
@@ -70,27 +66,6 @@ export default function ScopeTrendPanel({
       </div>
       {parseMultiSeries.length > 0 && (
         <>
-          <div
-            style={{
-              margin: "8px 0 4px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: "8px",
-            }}
-          >
-            <div
-              style={{
-                color: "#64748b",
-                fontSize: "12px",
-              }}
-            >
-              点击图例可切换曲线显示
-            </div>
-            <Button size="small" onClick={onShowAll} disabled={hiddenScopeSeriesNames.length === 0}>
-              全部显示
-            </Button>
-          </div>
           <div
             style={{
               margin: "0 0 4px",
@@ -102,19 +77,33 @@ export default function ScopeTrendPanel({
             {parseMultiSeries.map((line) => {
               const hidden = hiddenScopeSeriesNames.includes(line.name);
               return (
-                <Tag
+                <span
                   key={line.name}
-                  color={hidden ? undefined : line.color}
-                  style={{
-                    cursor: "pointer",
-                    opacity: hidden ? 0.5 : 1,
-                    textDecoration: hidden ? "line-through" : "none",
-                  }}
                   onClick={() => onToggleSeries(line.name)}
                   title={hidden ? "点击显示该曲线" : "点击隐藏该曲线"}
+                  style={{
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    fontSize: 12,
+                    color: hidden ? "var(--text-muted)" : "var(--text-sub)",
+                    textDecoration: hidden ? "line-through" : "none",
+                    userSelect: "none",
+                  }}
                 >
+                  <span
+                    style={{
+                      display: "inline-block",
+                      width: 6,
+                      height: 6,
+                      borderRadius: "50%",
+                      background: hidden ? "var(--text-muted)" : (line.color ?? "#e44d26"),
+                      flexShrink: 0,
+                    }}
+                  />
                   {line.name}
-                </Tag>
+                </span>
               );
             })}
           </div>
@@ -125,7 +114,7 @@ export default function ScopeTrendPanel({
         points={[]}
         multiSeries={visibleParseMultiSeries}
         showLegend={false}
-        color="#2f6df6"
+        color="#e44d26"
         showTitleValue={false}
         valueFormatter={formatRate2}
         axisValueFormatter={formatRate2}
