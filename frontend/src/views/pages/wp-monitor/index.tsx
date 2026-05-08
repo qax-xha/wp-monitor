@@ -11,10 +11,10 @@ import {
   collectAllNodeIds,
   fmtCount,
   fmtRate,
-} from "../../components/monitor/flowHelpers";
-import TimeSeriesChart from "../../components/monitor/TimeSeriesChart";
-import ScopeTrendPanel from "../../components/monitor/ScopeTrendPanel";
-import { MONITOR_SERIES_PALETTE } from "../../components/monitor/chartPalette";
+} from "@/views/components/monitor/flowHelpers";
+import TimeSeriesChart from "@/views/components/monitor/TimeSeriesChart";
+import ScopeTrendPanel from "@/views/components/monitor/ScopeTrendPanel";
+import { MONITOR_SERIES_PALETTE } from "@/views/components/monitor/chartPalette";
 import {
   exportMissedLogs,
   fetchMissedLogs,
@@ -24,14 +24,14 @@ import {
   fetchParseTimeSeries,
   fetchSnapshot,
   fetchVersion,
-} from "../../../services/monitor";
+} from "@/services/monitor";
 import type {
   LayerSnapshot,
   NodeDetail,
   NodeTimeSeries,
   VlogRecord,
-} from "../../../types/monitor";
-import logoUrl from "../../../assets/logo.svg";
+} from "@/types/monitor";
+import logoUrl from "@/assets/logo.svg";
 import "./index.css";
 
 const QUICK_RANGES = [
@@ -1619,7 +1619,7 @@ export default function WpMonitorPage() {
                     <div className="panel-head">
                       <div className="panel-head-main">
                         <Typography.Text strong style={{ fontSize: 13, color: "var(--text-sub)" }}>速率趋势</Typography.Text>
-                        <Divider type="vertical" style={{ margin: "0 2px", borderColor: "rgba(228,77,38,0.18)" }} />
+                        <Divider orientation="vertical" style={{ margin: "0 2px", borderColor: "rgba(228,77,38,0.18)" }} />
                         <Space size={4}>
                           <Typography.Text type="secondary" style={{ fontSize: 11 }}>采样间隔</Typography.Text>
                           <Typography.Text style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-sub)" }}>

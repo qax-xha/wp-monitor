@@ -1,6 +1,6 @@
 import { Divider, Space, Switch, Typography } from "antd";
-import TimeSeriesChart from "./TimeSeriesChart";
-import type { NodeTimeSeries, TimePoint } from "../../../types/monitor";
+import TimeSeriesChart from "@/views/components/monitor/TimeSeriesChart";
+import type { NodeTimeSeries, TimePoint } from "@/types/monitor";
 
 interface ScopeSeriesLine {
   name: string;
@@ -41,7 +41,7 @@ export default function ScopeTrendPanel({
       <div className="panel-head">
         <div className="panel-head-main">
           <Typography.Text strong style={{ fontSize: 13, color: "var(--text-sub)" }}>{"节点趋势"}</Typography.Text>
-          <Divider type="vertical" style={{ margin: "0 2px", borderColor: "rgba(228,77,38,0.18)" }} />
+          <Divider orientation="vertical" style={{ margin: "0 2px", borderColor: "rgba(228,77,38,0.18)" }} />
           <Space size={4}>
             <Typography.Text style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-sub)" }}>采样间隔</Typography.Text>
             <Typography.Text style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--accent)" }}>

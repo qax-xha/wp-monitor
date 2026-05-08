@@ -3,8 +3,8 @@ import { createRoot } from 'react-dom/client';
 import { ConfigProvider, App as AntApp, theme } from 'antd';
 import antdZhCN from 'antd/es/locale/zh_CN';
 import { RouterProvider } from 'react-router';
-import { createRouter } from './routes';
-import './index.css';
+import { createRouter } from '@/routes';
+import '@/index.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
