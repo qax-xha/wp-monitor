@@ -1,20 +1,5 @@
 # WP Monitor Frontend
 
-## 环境变量配置
-
-开发环境变量在 `.env.local` 文件中配置，此文件不进 Git 仓库。仓库中提供了 `.env.example` 模板文件，新开发者复制并改名即可：
-
-```bash
-cp .env.example .env.local   # 复制模板，按需修改
-```
-
-| 变量 | 默认值 | 说明 |
-|------|------|------|
-| `VITE_DEV_SERVER_PORT` | `5173` | 开发服务器端口 |
-| `VITE_PROXY_TARGET` | `https://monitor.alpha.warpparse.com` | API 代理目标地址 |
-
-环境变量通过 Vite 的 `loadEnv` 在 `vite.config.ts` 中读取，不会注入到客户端代码。
-
 ## 包管理器
 
 采用 **pnpm**，利用硬链接节省磁盘空间，安装速度显著快于其它 npm 包管理器。
@@ -28,9 +13,20 @@ pnpm build        # 生产构建 (tsc + vite)
 pnpm preview      # 预览构建产物
 ```
 
-## API 代理
+## 开发环境变量配置
 
-开发时后端 API 通过 Vite 代理转发，目标地址由 `.env.local` 中的 `VITE_PROXY_TARGET` 指定。前端请求 `/api/v1/...` 会被代理到目标服务，无需处理跨域。
+开发环境变量在 `.env.local` 文件中配置，此文件不进 Git 仓库。仓库中提供了 `.env.example` 模板文件，新开发者复制并改名即可：
+
+```bash
+cp .env.example .env.local   # 复制模板，按需修改
+```
+
+| 变量 | 默认值 | 说明 |
+|------|------|------|
+| `VITE_DEV_SERVER_PORT` | `5173` | 开发服务器端口 |
+| `VITE_PROXY_TARGET` | **必填，无默认值** | API 代理目标地址，未配置启动报错 |
+
+环境变量通过 Vite 的 `loadEnv` 在 `vite.config.ts` 中读取，不会注入到客户端代码。
 
 ## 文件路由
 
