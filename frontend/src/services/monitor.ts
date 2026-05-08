@@ -6,7 +6,7 @@ import type {
   NodeDetail,
   NodeTimeSeries,
   VersionInfo,
-} from "../types/monitor";
+} from "@/types/monitor";
 
 function normalizeIsoToSecondBoundary(iso: string) {
   const date = new Date(iso);

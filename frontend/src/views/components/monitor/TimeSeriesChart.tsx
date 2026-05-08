@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import ApexCharts, { type ApexOptions } from 'apexcharts';
-import type { TimePoint } from '../../../types/monitor';
-import { MONITOR_SERIES_PALETTE } from './chartPalette';
+import type { TimePoint } from '@/types/monitor';
+import { MONITOR_SERIES_PALETTE } from '@/views/components/monitor/chartPalette';
 
 interface Props {
   title: string;

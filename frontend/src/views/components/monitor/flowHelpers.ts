@@ -2,7 +2,7 @@ import type {
   LayerSnapshot,
   MetricsSnapshot,
   NodeMetricsItem,
-} from '../../../types/monitor';
+} from '@/types/monitor';
 
 export function collectAllNodeIds(snapshot: LayerSnapshot): string[] {
   const ids: string[] = [];
