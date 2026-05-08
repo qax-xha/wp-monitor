@@ -31,6 +31,7 @@ import type {
   NodeTimeSeries,
   VlogRecord,
 } from "../../../types/monitor";
+import logoUrl from "../../../assets/logo.svg";
 import "./index.css";
 
 const QUICK_RANGES = [
@@ -1070,7 +1071,7 @@ export default function WpMonitorPage() {
           <div className="title-logo-shell" aria-hidden="true">
             <img
               className="title-logo"
-              src="/asset/wp-monitor-logo.png"
+              src={logoUrl}
               alt="WP Monitor logo"
             />
           </div>
