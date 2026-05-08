@@ -22,7 +22,7 @@ export default defineConfig(() => ({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'https://monitor.alpha.warpparse.com',
+        target: 'http://localhost:18080',
         changeOrigin: true,
       }
     },
