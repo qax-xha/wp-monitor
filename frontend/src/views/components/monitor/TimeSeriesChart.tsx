@@ -31,7 +31,6 @@ export default function TimeSeriesChart({
   multiSeries,
   color,
   showLegend = true,
-  showTitleValue = true,
   valueFormatter,
   axisValueFormatter,
   minY,
@@ -44,7 +43,6 @@ export default function TimeSeriesChart({
   const flatPoints = isMulti
     ? (multiSeries ?? []).flatMap((seriesItem) => seriesItem.points)
     : points;
-  const latest = points[points.length - 1]?.value ?? 0;
   const firstTs = flatPoints[0] ? new Date(flatPoints[0].ts).getTime() : undefined;
   const lastTs = flatPoints[flatPoints.length - 1]
     ? new Date(flatPoints[flatPoints.length - 1].ts).getTime()
@@ -77,15 +75,15 @@ export default function TimeSeriesChart({
     () =>
       isMulti
         ? (multiSeries ?? []).map((seriesItem) => ({
-            name: seriesItem.name,
-            data: seriesItem.points.map((point) => ({ x: new Date(point.ts).getTime(), y: point.value })),
-          }))
+          name: seriesItem.name,
+          data: seriesItem.points.map((point) => ({ x: new Date(point.ts).getTime(), y: point.value })),
+        }))
         : [
-            {
-              name: title,
-              data: points.map((point) => ({ x: new Date(point.ts).getTime(), y: point.value })),
-            },
-          ],
+          {
+            name: title,
+            data: points.map((point) => ({ x: new Date(point.ts).getTime(), y: point.value })),
+          },
+        ],
     [isMulti, multiSeries, points, title],
   );
 
@@ -162,6 +160,7 @@ export default function TimeSeriesChart({
         },
       },
       tooltip: {
+        theme: 'dark',
         shared: isMulti,
         intersect: false,
         followCursor: true,
@@ -238,11 +237,6 @@ export default function TimeSeriesChart({
 
   return (
     <div className="spark">
-      <div className="spark-title">
-        {showTitleValue && !isMulti
-          ? `${title} · ${valueFormatter ? valueFormatter(latest) : latest.toFixed(2)}`
-          : title}
-      </div>
       <div ref={chartRef} className="spark-chart" />
       {showRangeMeta && (
         <div className="spark-meta">

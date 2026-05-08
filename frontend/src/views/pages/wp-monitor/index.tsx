@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  App, Button, DatePicker, Input, InputNumber, Space, Switch, Typography,
+  App, Button, DatePicker, Divider, Input, InputNumber, Space, Switch, Typography,
 } from "antd";
 import { ChevronDown } from "lucide-react";
 import dayjs, { type Dayjs } from "dayjs";
@@ -39,8 +39,8 @@ const QUICK_RANGES = [
   { key: "1h", label: "最近 1 小时", minutes: 60 },
   { key: "6h", label: "最近 6 小时", minutes: 360 },
   { key: "24h", label: "最近 24 小时", minutes: 1440 },
-  { key: "today", label: "今天" },
-  { key: "yesterday", label: "昨天" },
+  // { key: "today", label: "今天" },
+  // { key: "yesterday", label: "昨天" },
   { key: "week", label: "本周" },
 ] as const;
 const MISS_PAGE_SIZE = 10;
@@ -58,21 +58,21 @@ type LegendType =
   | null;
 type ParseSearchItem =
   | {
-      key: string;
-      type: "package";
-      packageId: string;
-      packageName: string;
-      label: string;
-    }
+    key: string;
+    type: "package";
+    packageId: string;
+    packageName: string;
+    label: string;
+  }
   | {
-      key: string;
-      type: "log";
-      packageId: string;
-      packageName: string;
-      logId: string;
-      logName: string;
-      label: string;
-    };
+    key: string;
+    type: "log";
+    packageId: string;
+    packageName: string;
+    logId: string;
+    logName: string;
+    label: string;
+  };
 type ScopeSeriesRequest = {
   scope: "parse" | "source" | "sink";
   packageName?: string;
@@ -178,6 +178,7 @@ export default function WpMonitorPage() {
 
   const [selectedNode, setSelectedNode] = useState("");
   const [hoveredNode, setHoveredNode] = useState("");
+  const [sweepNode, setSweepNode] = useState("");
   const [detail, setDetail] = useState<NodeDetail | null>(null);
   const [detailNodePill, setDetailNodePill] = useState("");
   const [detailViewMode, setDetailViewMode] = useState<"node" | "scope">(
@@ -353,6 +354,12 @@ export default function WpMonitorPage() {
   }, [selectedNode]);
 
   useEffect(() => {
+    if (!sweepNode) return;
+    const timer = setTimeout(() => setSweepNode(""), 1300);
+    return () => clearTimeout(timer);
+  }, [sweepNode]);
+
+  useEffect(() => {
     const onResize = () => {
       setDetailPanelHeight((prev) => clampDetailPanelHeight(prev));
     };
@@ -388,7 +395,7 @@ export default function WpMonitorPage() {
           if (cached) return cached;
           const color =
             MONITOR_SERIES_PALETTE[
-              scopeSeriesColorCursorRef.current % MONITOR_SERIES_PALETTE.length
+            scopeSeriesColorCursorRef.current % MONITOR_SERIES_PALETTE.length
             ];
           scopeSeriesColorMapRef.current.set(seriesItem.node_id, color);
           scopeSeriesColorCursorRef.current += 1;
@@ -586,9 +593,9 @@ export default function WpMonitorPage() {
         return { pkg: parseItem, logsMatched };
       })
       .filter(Boolean) as Array<{
-      pkg: LayerSnapshot["parses"][number];
-      logsMatched: LayerSnapshot["parses"][number]["logs"];
-    }>;
+        pkg: LayerSnapshot["parses"][number];
+        logsMatched: LayerSnapshot["parses"][number]["logs"];
+      }>;
   }, [snapshot, parseQuery]);
 
   const parseSearchFlatItems = useMemo(() => {
@@ -659,6 +666,7 @@ export default function WpMonitorPage() {
     const classes = [base];
     if (selectedNode === nodeId) classes.push("selected");
     if (hoveredNode === nodeId) classes.push("active");
+    if (sweepNode === nodeId) classes.push("sweep");
     return classes.join(" ");
   }
 
@@ -1100,31 +1108,31 @@ export default function WpMonitorPage() {
           <div className="wd-chip wd-time-field wd-time-range-field">
             <span className="wd-time-field-label">时间范围</span>
             <RangePicker
-                className="wd-ant-range"
-                classNames={{ popup: { root: "wd-ant-range-popup" } }}
-                style={{ width: "336px", maxWidth: "100%" }}
-                value={[
-                  draftStart ? dayjs(draftStart) : null,
-                  draftEnd ? dayjs(draftEnd) : null,
-                ]}
-                onChange={(dates: null | [Dayjs | null, Dayjs | null]) => {
-                  setDraftRange("custom");
-                  setDraftStart(dates?.[0]?.toDate() ?? null);
-                  setDraftEnd(dates?.[1]?.toDate() ?? null);
-                }}
-                onCalendarChange={() => {
-                  setDraftRange("custom");
-                }}
-                onOpenChange={(open) => {
-                  if (open) setDraftRange("custom");
-                }}
-                showTime={{ format: "HH:mm:ss", minuteStep: 1, secondStep: 1 }}
-                format="YYYY-MM-DD HH:mm:ss"
-                allowClear={false}
-                separator="→"
-                suffixIcon={null}
-                placeholder={["开始时间", "结束时间"]}
-              />
+              className="wd-ant-range"
+              classNames={{ popup: { root: "wd-ant-range-popup" } }}
+              style={{ width: "336px", maxWidth: "100%" }}
+              value={[
+                draftStart ? dayjs(draftStart) : null,
+                draftEnd ? dayjs(draftEnd) : null,
+              ]}
+              onChange={(dates: null | [Dayjs | null, Dayjs | null]) => {
+                setDraftRange("custom");
+                setDraftStart(dates?.[0]?.toDate() ?? null);
+                setDraftEnd(dates?.[1]?.toDate() ?? null);
+              }}
+              onCalendarChange={() => {
+                setDraftRange("custom");
+              }}
+              onOpenChange={(open) => {
+                if (open) setDraftRange("custom");
+              }}
+              showTime={{ format: "HH:mm:ss", minuteStep: 1, secondStep: 1 }}
+              format="YYYY-MM-DD HH:mm:ss"
+              allowClear={false}
+              separator="→"
+              suffixIcon={null}
+              placeholder={["开始时间", "结束时间"]}
+            />
           </div>
           <Button
             type="primary"
@@ -1190,8 +1198,8 @@ export default function WpMonitorPage() {
                   <article
                     key={node.id}
                     className={nodeClass("node card source", node.id, "source")}
-                    onMouseEnter={() => setHoveredNode(node.id)}
-                    onMouseLeave={() => setHoveredNode("")}
+                    onMouseEnter={() => { setHoveredNode(node.id); setSweepNode(node.id); }}
+                    onMouseLeave={() => { setHoveredNode(""); setSweepNode(""); }}
                     onClick={() => void openDetail(node.id)}
                   >
                     <div className="node-name">{node.name}</div>
@@ -1300,8 +1308,14 @@ export default function WpMonitorPage() {
                     <section
                       key={parseItem.id}
                       className={nodeClass("package card", parseItem.id, "package")}
-                      onMouseEnter={() => setHoveredNode(parseItem.id)}
-                      onMouseLeave={() => setHoveredNode("")}
+                      onMouseEnter={(e) => {
+                        setHoveredNode(parseItem.id);
+                        const related = e.relatedTarget as Element | null;
+                        if (!related || !e.currentTarget.contains(related)) {
+                          setSweepNode(parseItem.id);
+                        }
+                      }}
+                      onMouseLeave={() => { setHoveredNode(""); setSweepNode(""); }}
                       onClick={handlePackageClick}
                     >
                       <div className="package-head">
@@ -1395,7 +1409,7 @@ export default function WpMonitorPage() {
                     )
                   }
                 >
-                  输出层 
+                  输出层
                 </div>
                 <div className="lane-actions">
                   <Button size="small" onClick={() => setExpandedGroups(snapshot.sinks.map((group) => group.id))}>
@@ -1422,8 +1436,14 @@ export default function WpMonitorPage() {
                     <section
                       key={group.id}
                       className={nodeClass("group card", group.id, "group")}
-                      onMouseEnter={() => setHoveredNode(group.id)}
-                      onMouseLeave={() => setHoveredNode("")}
+                      onMouseEnter={(e) => {
+                        setHoveredNode(group.id);
+                        const related = e.relatedTarget as Element | null;
+                        if (!related || !e.currentTarget.contains(related)) {
+                          setSweepNode(group.id);
+                        }
+                      }}
+                      onMouseLeave={() => { setHoveredNode(""); setSweepNode(""); }}
                       onClick={handleGroupClick}
                     >
                       <div className="group-head">
@@ -1483,7 +1503,7 @@ export default function WpMonitorPage() {
               </div>
             </section>
           </div>
-      )}
+        )}
       </div>
 
       <aside
@@ -1501,7 +1521,7 @@ export default function WpMonitorPage() {
         </div>
         <div className="detail-panel-head">
           <div className="detail-panel-head-left">
-            <div className="detail-panel-title">节点详情</div>
+            <Typography.Text style={{ fontSize: 13, fontFamily: "var(--font-mono)", color: "var(--success)" }}>节点详情</Typography.Text>
             {detailNodePill && (
               <span className={`detail-node-pill detail-node-pill--${detailNodePillType}`}>
                 {detailNodePill}
@@ -1547,7 +1567,7 @@ export default function WpMonitorPage() {
                 onToggleAutoRefresh={() =>
                   setDetailTrendAutoRefresh((prev) => !prev)
                 }
-                onShowAll={() => setHiddenScopeSeriesNames([])}
+
                 onToggleSeries={(name) =>
                   setHiddenScopeSeriesNames((prev) =>
                     prev.includes(name)
@@ -1563,151 +1583,150 @@ export default function WpMonitorPage() {
             !drawerError &&
             detailViewMode === "node" &&
             detail && (
-            <div className={`detail-grid ${isMissSelected ? "miss-mode" : ""}`}>
-              <section className="panel card detail-col">
-                <div className="panel-title">基本信息</div>
-                <div className="detail-name-type-row">
-                  <span
-                    className="detail-kv-value detail-name-only"
-                    title={detail.name}
-                  >
-                    {detail.name}
-                  </span>
-                  <span className="detail-type-badge">{detail.node_type}</span>
-                </div>
-                <div className="detail-metric-badges">
-                  <span className="detail-metric-badge">
-                    速率 {fmtRate(detail.metrics.log_rate_eps)}
-                  </span>
-                  <span className="detail-metric-badge">
-                    数量 {fmtCount(detail.metrics.log_count)}
-                  </span>
-                </div>
-                <div className="detail-time-row">
-                  <span className="detail-kv-label">时间窗口</span>
-                  <span className="detail-kv-value detail-time-value">
-                    {formatLocalDateTime(detailStartTime)} -{" "}
-                    {formatLocalDateTime(detailEndTime)}
-                  </span>
-                </div>
-              </section>
-
-              {!isMissSelected && (
+              <div className={`detail-grid ${isMissSelected ? "miss-mode" : ""}`}>
                 <section className="panel card detail-col">
-                  <div className="panel-head">
-                    <div className="panel-head-main">
-                      <div className="panel-title">速率趋势</div>
-                      <span className="detail-kv-value detail-time-value detail-param-list">
-                        <span className="detail-param-item">
-                          <span className="detail-param-name">采样间隔</span>
-                          <span className="detail-param-data">
-                            {series?.step_secs ?? 0}s
-                          </span>
-                        </span>
-                        <span className="detail-param-item">
-                          <span className="detail-param-name">统计窗口</span>
-                          <span className="detail-param-data">
-                            {series?.rate_window_secs ?? 0}s
-                          </span>
-                        </span>
-                      </span>
-                    </div>
-                    <Space>
-                      <Typography.Text type="secondary" style={{ fontSize: 12 }}>实时刷新</Typography.Text>
-                      <Switch
-                        size="small"
-                        checked={detailTrendAutoRefresh}
-                        onChange={setDetailTrendAutoRefresh}
-                      />
-                    </Space>
-                  </div>
-                  <TimeSeriesChart
-                    title="速率趋势"
-                    points={rateChartPoints}
-                    color="#2f6df6"
-                    showTitleValue={false}
-                    valueFormatter={formatRate2}
-                    axisValueFormatter={formatRate2}
-                    minY={0}
-                    yTickAmount={6}
-                    rangeStartLabel={formatLocalTime(detailStartTime)}
-                    rangeEndLabel={formatLocalTime(detailEndTime)}
-                    showRangeMeta={false}
-                  />
-                </section>
-              )}
-
-              {isMissSelected && (
-                <section className="panel card detail-col detail-miss-col">
-                  <div className="panel-title">MISS 原始日志</div>
-                  <div className="miss-query-toolbar">
-                    <Button
-                      size="small"
-                      onClick={() =>
-                        void loadMissedLogs(
-                          missWindowStart || detailStartTime,
-                          missWindowEnd || detailEndTime,
-                          missPage,
-                        )
-                      }
-                      disabled={missLogsLoading}
+                  <div className="panel-title">基本信息</div>
+                  <div className="detail-name-type-row">
+                    <span
+                      className="detail-kv-value detail-name-only"
+                      title={detail.name}
                     >
-                      刷新本页
-                    </Button>
-                    <Button size="small" onClick={() => void onExportMissed()} disabled={missExporting}>
-                      {missExporting ? "导出中..." : "数据导出"}
-                    </Button>
+                      {detail.name}
+                    </span>
+                    <span className="detail-type-badge">{detail.node_type}</span>
                   </div>
-                  {missLogsLoading && <p>MISS 日志加载中...</p>}
-                  {!missLogsLoading && missLogsError && (
-                    <p className="error">错误: {missLogsError}</p>
-                  )}
-                  {!missLogsLoading &&
-                    !missLogsError &&
-                    missLogs.length === 0 && <p>当前时间窗口无 MISS 日志</p>}
-                  {!missLogsLoading &&
-                    !missLogsError &&
-                    missLogs.length > 0 && (
-                      <>
-                        <p className="miss-page-meta">
-                          第 {missPage} 页 / 每页 10 条
-                          {missHasMore ? "（可继续翻页）" : "（已到末页）"}
-                        </p>
-                        <div className="miss-scroll">
-                          <div className="miss-list">
-                            {missPageItems.map((item, index) => {
-                              const offset = (missPage - 1) * MISS_PAGE_SIZE;
-                              const rowNo = offset + index + 1;
-                              return (
-                                <article
-                                  key={`${item.time}-${item.stream_id}-${rowNo}`}
-                                  className="miss-record"
-                                >
-                                  <div className="miss-record-head">
-                                    #{rowNo} | {formatLocalDateTime(item.time)}
-                                  </div>
-                                  <pre className="miss-record-raw">
-                                    {item.raw}
-                                  </pre>
-                                </article>
-                              );
-                            })}
-                          </div>
-                        </div>
-                        <div className="miss-pager">
-                          <Button size="small" disabled={missPage <= 1 || missLogsLoading} onClick={() => void onPrevMissPage()}>
-                            上一页
-                          </Button>
-                          <Button size="small" disabled={missLogsLoading || !missHasMore} onClick={() => void onNextMissPage()}>
-                            下一页
-                          </Button>
-                        </div>
-                      </>
-                    )}
+                  <div className="detail-metric-badges">
+                    <span className="detail-metric-badge">
+                      速率 {fmtRate(detail.metrics.log_rate_eps)}
+                    </span>
+                    <span className="detail-metric-badge">
+                      数量 {fmtCount(detail.metrics.log_count)}
+                    </span>
+                  </div>
+                  <div className="detail-time-row">
+                    <span className="detail-kv-label">时间窗口</span>
+                    <span className="detail-kv-value detail-time-value">
+                      {formatLocalDateTime(detailStartTime)} -{" "}
+                      {formatLocalDateTime(detailEndTime)}
+                    </span>
+                  </div>
                 </section>
-              )}
-            </div>
-          )}
+
+                {!isMissSelected && (
+                  <section className="panel card detail-col">
+                    <div className="panel-head">
+                      <div className="panel-head-main">
+                        <Typography.Text strong style={{ fontSize: 13, color: "var(--text-sub)" }}>速率趋势</Typography.Text>
+                        <Divider type="vertical" style={{ margin: "0 2px", borderColor: "rgba(129,140,248,0.18)" }} />
+                        <Space size={4}>
+                          <Typography.Text type="secondary" style={{ fontSize: 11 }}>采样间隔</Typography.Text>
+                          <Typography.Text style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-sub)" }}>
+                            {series?.step_secs ?? 0}s
+                          </Typography.Text>
+                        </Space>
+                        <Space size={4}>
+                          <Typography.Text type="secondary" style={{ fontSize: 11 }}>统计窗口</Typography.Text>
+                          <Typography.Text style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-sub)" }}>
+                            {series?.rate_window_secs ?? 0}s
+                          </Typography.Text>
+                        </Space>
+                      </div>
+                      <Space>
+                        <Typography.Text type="secondary" style={{ fontSize: 12 }}>实时刷新</Typography.Text>
+                        <Switch
+                          size="small"
+                          checked={detailTrendAutoRefresh}
+                          onChange={setDetailTrendAutoRefresh}
+                        />
+                      </Space>
+                    </div>
+                    <TimeSeriesChart
+                      title="速率趋势"
+                      points={rateChartPoints}
+                      color="#2f6df6"
+                      showTitleValue={false}
+                      valueFormatter={formatRate2}
+                      axisValueFormatter={formatRate2}
+                      minY={0}
+                      yTickAmount={6}
+                      rangeStartLabel={formatLocalTime(detailStartTime)}
+                      rangeEndLabel={formatLocalTime(detailEndTime)}
+                      showRangeMeta={false}
+                    />
+                  </section>
+                )}
+
+                {isMissSelected && (
+                  <section className="panel card detail-col detail-miss-col">
+                    <div className="panel-title">MISS 原始日志</div>
+                    <div className="miss-query-toolbar">
+                      <Button
+                        size="small"
+                        onClick={() =>
+                          void loadMissedLogs(
+                            missWindowStart || detailStartTime,
+                            missWindowEnd || detailEndTime,
+                            missPage,
+                          )
+                        }
+                        disabled={missLogsLoading}
+                      >
+                        刷新本页
+                      </Button>
+                      <Button size="small" onClick={() => void onExportMissed()} disabled={missExporting}>
+                        {missExporting ? "导出中..." : "数据导出"}
+                      </Button>
+                    </div>
+                    {missLogsLoading && <p>MISS 日志加载中...</p>}
+                    {!missLogsLoading && missLogsError && (
+                      <p className="error">错误: {missLogsError}</p>
+                    )}
+                    {!missLogsLoading &&
+                      !missLogsError &&
+                      missLogs.length === 0 && <p>当前时间窗口无 MISS 日志</p>}
+                    {!missLogsLoading &&
+                      !missLogsError &&
+                      missLogs.length > 0 && (
+                        <>
+                          <p className="miss-page-meta">
+                            第 {missPage} 页 / 每页 10 条
+                            {missHasMore ? "（可继续翻页）" : "（已到末页）"}
+                          </p>
+                          <div className="miss-scroll">
+                            <div className="miss-list">
+                              {missPageItems.map((item, index) => {
+                                const offset = (missPage - 1) * MISS_PAGE_SIZE;
+                                const rowNo = offset + index + 1;
+                                return (
+                                  <article
+                                    key={`${item.time}-${item.stream_id}-${rowNo}`}
+                                    className="miss-record"
+                                  >
+                                    <div className="miss-record-head">
+                                      #{rowNo} | {formatLocalDateTime(item.time)}
+                                    </div>
+                                    <pre className="miss-record-raw">
+                                      {item.raw}
+                                    </pre>
+                                  </article>
+                                );
+                              })}
+                            </div>
+                          </div>
+                          <div className="miss-pager">
+                            <Button size="small" disabled={missPage <= 1 || missLogsLoading} onClick={() => void onPrevMissPage()}>
+                              上一页
+                            </Button>
+                            <Button size="small" disabled={missLogsLoading || !missHasMore} onClick={() => void onNextMissPage()}>
+                              下一页
+                            </Button>
+                          </div>
+                        </>
+                      )}
+                  </section>
+                )}
+              </div>
+            )}
 
           {!drawerLoading &&
             !drawerError &&
