@@ -198,7 +198,7 @@ export default function WpMonitorPage() {
   const [detailEndTime, setDetailEndTime] = useState("");
   const [drawerLoading, setDrawerLoading] = useState(false);
   const [drawerError, setDrawerError] = useState("");
-  const [detailPanelHeight, setDetailPanelHeight] = useState(300);
+  const [detailPanelHeight, setDetailPanelHeight] = useState(290);
   const [missLogsLoading, setMissLogsLoading] = useState(false);
   const [missLogsError, setMissLogsError] = useState("");
   const [missLogs, setMissLogs] = useState<VlogRecord[]>([]);
@@ -1386,13 +1386,14 @@ export default function WpMonitorPage() {
                   onMouseLeave={() => setHoveredNode("")}
                   onClick={() => void openDetail(snapshot.miss.id)}
                 >
-                  <div className="node-name">{snapshot.miss.name}</div>
-                  <div className="node-sub">未命中任何 WPL 规则</div>
-                  <div className="metric-badges">
-                    <span className="metric-badge">速率 {fmtRate(snapshot.miss.metrics.log_rate_eps)}</span>
-                    <span className="metric-badge">数量 {fmtCount(snapshot.miss.metrics.log_count)}</span>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                    <div className="node-name" style={{ marginBottom: 0 }}>{snapshot.miss.name}</div>
+                    <div className="metric-badges" style={{ marginTop: 0 }}>
+                      <span className="metric-badge">速率 {fmtRate(snapshot.miss.metrics.log_rate_eps)}</span>
+                      <span className="metric-badge">数量 {fmtCount(snapshot.miss.metrics.log_count)}</span>
+                    </div>
                   </div>
-                  <div className="node-sub">(不流向任何输出)</div>
+                  <div className="node-sub">未命中任何 WPL 规则 · 不流向任何输出</div>
                 </article>
               </div>
             </section>
