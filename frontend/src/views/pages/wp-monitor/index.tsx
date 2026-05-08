@@ -198,7 +198,7 @@ export default function WpMonitorPage() {
   const [detailEndTime, setDetailEndTime] = useState("");
   const [drawerLoading, setDrawerLoading] = useState(false);
   const [drawerError, setDrawerError] = useState("");
-  const [detailPanelHeight, setDetailPanelHeight] = useState(360);
+  const [detailPanelHeight, setDetailPanelHeight] = useState(300);
   const [missLogsLoading, setMissLogsLoading] = useState(false);
   const [missLogsError, setMissLogsError] = useState("");
   const [missLogs, setMissLogs] = useState<VlogRecord[]>([]);
@@ -1521,7 +1521,7 @@ export default function WpMonitorPage() {
         </div>
         <div className="detail-panel-head">
           <div className="detail-panel-head-left">
-            <Typography.Text style={{ fontSize: 13, fontFamily: "var(--font-mono)", color: "var(--success)" }}>节点详情</Typography.Text>
+            <Typography.Text style={{ fontSize: 13, fontFamily: "var(--font-mono)", color: "var(--accent)" }}>节点详情</Typography.Text>
             {detailNodePill && (
               <span className={`detail-node-pill detail-node-pill--${detailNodePillType}`}>
                 {detailNodePill}
@@ -1617,7 +1617,7 @@ export default function WpMonitorPage() {
                     <div className="panel-head">
                       <div className="panel-head-main">
                         <Typography.Text strong style={{ fontSize: 13, color: "var(--text-sub)" }}>速率趋势</Typography.Text>
-                        <Divider type="vertical" style={{ margin: "0 2px", borderColor: "rgba(129,140,248,0.18)" }} />
+                        <Divider type="vertical" style={{ margin: "0 2px", borderColor: "rgba(228,77,38,0.18)" }} />
                         <Space size={4}>
                           <Typography.Text type="secondary" style={{ fontSize: 11 }}>采样间隔</Typography.Text>
                           <Typography.Text style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-sub)" }}>
@@ -1643,7 +1643,7 @@ export default function WpMonitorPage() {
                     <TimeSeriesChart
                       title="速率趋势"
                       points={rateChartPoints}
-                      color="#2f6df6"
+                      color="#e44d26"
                       showTitleValue={false}
                       valueFormatter={formatRate2}
                       axisValueFormatter={formatRate2}

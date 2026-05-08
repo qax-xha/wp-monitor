@@ -41,7 +41,7 @@ export default function ScopeTrendPanel({
       <div className="panel-head">
         <div className="panel-head-main">
           <Typography.Text strong style={{ fontSize: 13, color: "var(--text-sub)" }}>{"节点趋势"}</Typography.Text>
-          <Divider type="vertical" style={{ margin: "0 2px", borderColor: "rgba(129,140,248,0.18)" }} />
+          <Divider type="vertical" style={{ margin: "0 2px", borderColor: "rgba(228,77,38,0.18)" }} />
           <Space size={4}>
             <Typography.Text style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-sub)" }}>采样间隔</Typography.Text>
             <Typography.Text style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--accent)" }}>
@@ -87,7 +87,7 @@ export default function ScopeTrendPanel({
                     alignItems: "center",
                     gap: 4,
                     fontSize: 12,
-                    color: hidden ? "#64748b" : "#94a3b8",
+                    color: hidden ? "var(--text-muted)" : "var(--text-sub)",
                     textDecoration: hidden ? "line-through" : "none",
                     userSelect: "none",
                   }}
@@ -98,7 +98,7 @@ export default function ScopeTrendPanel({
                       width: 6,
                       height: 6,
                       borderRadius: "50%",
-                      background: hidden ? "#64748b" : (line.color ?? "#818cf8"),
+                      background: hidden ? "var(--text-muted)" : (line.color ?? "#e44d26"),
                       flexShrink: 0,
                     }}
                   />
@@ -114,7 +114,7 @@ export default function ScopeTrendPanel({
         points={[]}
         multiSeries={visibleParseMultiSeries}
         showLegend={false}
-        color="#2f6df6"
+        color="#e44d26"
         showTitleValue={false}
         valueFormatter={formatRate2}
         axisValueFormatter={formatRate2}
