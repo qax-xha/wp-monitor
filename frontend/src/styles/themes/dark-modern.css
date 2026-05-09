@@ -1,0 +1,45 @@
+[data-theme="dark-modern"] {
+  --accent: #e44d26;
+  --accent-rgb: 228, 77, 38;
+  --accent-dark: #b33a1a;
+  --accent-gradient: linear-gradient(135deg, #e44d26, #b33a1a);
+  --badge-text: #fcd9c6;
+  --node-name-color: #fcd9c6;
+  --title-glow: 0 0 20px rgba(228, 77, 38, 0.15);
+  --accent-glow: rgba(228, 77, 38, 0.2);
+  --accent-soft: rgba(228, 77, 38, 0.07);
+  --border-subtle: rgba(228, 77, 38, 0.08);
+
+  --source-color: #e44d26;
+  --source-rgb: 228, 77, 38;
+  --source-bg: rgba(228, 77, 38, 0.08);
+  --source-border: rgba(228, 77, 38, 0.75);
+
+  --package-color: #e44d26;
+  --package-rgb: 228, 77, 38;
+  --package-bg: rgba(228, 77, 38, 0.08);
+  --package-border: rgba(228, 77, 38, 0.75);
+
+  --log-color: #e44d26;
+  --log-rgb: 228, 77, 38;
+  --log-bg: rgba(228, 77, 38, 0.04);
+  --log-border: rgba(228, 77, 38, 0.45);
+
+  --group-color: #faa918;
+  --group-rgb: 250, 169, 24;
+  --group-bg: rgba(250, 169, 24, 0.08);
+  --group-border: rgba(250, 169, 24, 0.75);
+
+  --sink-color: #faa918;
+  --sink-rgb: 250, 169, 24;
+  --sink-bg: rgba(250, 169, 24, 0.04);
+  --sink-border: rgba(250, 169, 24, 0.45);
+
+  --miss-color: #e04848;
+  --miss-rgb: 224, 72, 72;
+  --miss-bg: rgba(224, 72, 72, 0.08);
+  --miss-border: rgba(224, 72, 72, 0.55);
+  --miss-text-light: #e8a0a0;
+  --miss-border-style: dashed;
+  --detail-heading-color: #fcd9c6;
+}

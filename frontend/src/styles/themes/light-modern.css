@@ -1,0 +1,170 @@
+[data-theme="light-modern"] {
+  /* ---- 基底 ---- */
+  --body-bg: #f5f5f7;
+  --body-bg-image: none;
+  --body-bg-dots: radial-gradient(rgba(0, 0, 0, 0.04) 1px, transparent 1px);
+  --page-bg: #f5f5f7;
+  --card-bg: rgba(255, 255, 255, 0.8);
+  --ctrl-bg: rgba(255, 255, 255, 0.65);
+  --canvas-bg: rgba(255, 255, 255, 0.55);
+  --lane-bg: rgba(0, 0, 0, 0.03);
+  --surface-fill: rgba(255, 255, 255, 0.6);
+  --surface-raised: rgba(255, 255, 255, 0.75);
+  --surface-overlay: rgba(255, 255, 255, 0.96);
+  --surface-header: rgba(255, 255, 255, 0.65);
+  --surface-drawer: rgba(255, 255, 255, 0.98);
+  --surface-input: rgba(255, 255, 255, 0.5);
+  --tooltip-bg: rgba(255, 255, 255, 0.98);
+
+  /* ---- 文字 ---- */
+  --text-main: #1d1d1f;
+  --text-sub: #6e6e73;
+  --text-muted: #aeaeb2;
+  --title-color: #1d1d1f;
+
+  /* ---- 强调色 ---- */
+  --accent: #007AFF;
+  --accent-rgb: 0, 122, 255;
+  --accent-dark: #0062CC;
+  --accent-gradient: linear-gradient(135deg, #007AFF, #0062CC);
+  --badge-text: #1d1d1f;
+  --node-name-color: #1d1d1f;
+  --title-glow: none;
+  --accent-glow: rgba(0, 122, 255, 0.12);
+  --accent-soft: rgba(0, 122, 255, 0.04);
+  --border-subtle: rgba(0, 0, 0, 0.08);
+  --detail-heading-color: #6e6e73;
+
+  /* ---- 三列统一中性色 ---- */
+  --source-color: #6e6e73;
+  --source-rgb: 110, 110, 115;
+  --source-bg: transparent;
+  --source-border: rgba(0, 0, 0, 0.14);
+
+  --package-color: #6e6e73;
+  --package-rgb: 110, 110, 115;
+  --package-bg: transparent;
+  --package-border: rgba(0, 0, 0, 0.14);
+
+  --log-color: #6e6e73;
+  --log-rgb: 110, 110, 115;
+  --log-bg: transparent;
+  --log-border: rgba(0, 0, 0, 0.1);
+
+  --group-color: #6e6e73;
+  --group-rgb: 110, 110, 115;
+  --group-bg: transparent;
+  --group-border: rgba(0, 0, 0, 0.14);
+
+  --sink-color: #6e6e73;
+  --sink-rgb: 110, 110, 115;
+  --sink-bg: transparent;
+  --sink-border: rgba(0, 0, 0, 0.1);
+
+  /* ---- MISS ---- */
+  --miss-color: #FF3B30;
+  --miss-rgb: 255, 59, 48;
+  --miss-bg: rgba(255, 59, 48, 0.06);
+  --miss-border: rgba(255, 59, 48, 0.35);
+  --miss-text-light: #FF3B30;
+  --miss-border-style: solid;
+
+  --color-scheme: light;
+
+  --scrollbar-track: rgba(0, 0, 0, 0.06);
+  --scrollbar-thumb: rgba(0, 0, 0, 0.18);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.32);
+}
+
+/* ---- 浅色模式：lane 边框 / badge 中性 ---- */
+[data-theme="light-modern"] .lane {
+  border-color: rgba(0, 0, 0, 0.08);
+}
+[data-theme="light-modern"] .metric-badge,
+[data-theme="light-modern"] .metric-inline-badge,
+[data-theme="light-modern"] .detail-metric-badge {
+  border-color: rgba(0, 0, 0, 0.1);
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--text-main);
+}
+
+/* ---- 浅色模式：详情面板边框 / pill 中性 ---- */
+[data-theme="light-modern"] .detail-panel {
+  border-color: rgba(0, 0, 0, 0.12);
+  box-shadow: 0 -8px 48px rgba(0, 0, 0, 0.12), 0 0 16px rgba(0, 0, 0, 0.06);
+}
+[data-theme="light-modern"] .detail-panel.card:hover {
+  border-color: rgba(0, 0, 0, 0.16);
+  box-shadow: 0 -8px 48px rgba(0, 0, 0, 0.12), 0 0 16px rgba(0, 0, 0, 0.06);
+}
+[data-theme="light-modern"] .detail-panel-head {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+[data-theme="light-modern"] .detail-grid .panel.card {
+  border-color: rgba(0, 0, 0, 0.1);
+}
+[data-theme="light-modern"] .detail-node-pill--package {
+  border-color: rgba(0, 0, 0, 0.1);
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--text-sub);
+}
+
+/* ---- 浅色模式：选中态 ---- */
+[data-theme="light-modern"] .node.selected,
+[data-theme="light-modern"] .package.selected,
+[data-theme="light-modern"] .log-item.selected,
+[data-theme="light-modern"] .sink-item.selected,
+[data-theme="light-modern"] .group.selected {
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.08), inset 0 0 4px rgba(0, 0, 0, 0.03);
+  background: rgba(0, 0, 0, 0.05);
+}
+[data-theme="light-modern"] .package:has(.log-item.selected),
+[data-theme="light-modern"] .group:has(.sink-item.selected) {
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.08), inset 0 0 4px rgba(0, 0, 0, 0.03);
+  background: rgba(0, 0, 0, 0.05);
+}
+
+/* ---- 浅色模式 hover ---- */
+[data-theme="light-modern"] .card:hover {
+  border-color: rgba(0, 0, 0, 0.12);
+}
+[data-theme="light-modern"] .node:hover,
+[data-theme="light-modern"] .package:hover,
+[data-theme="light-modern"] .group:hover {
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.08);
+}
+[data-theme="light-modern"] .package-head:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+[data-theme="light-modern"] .log-item:hover,
+[data-theme="light-modern"] .sink-item:hover {
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.06);
+  border-color: rgba(0, 0, 0, 0.3);
+}
+[data-theme="light-modern"] .miss-alert:hover {
+  box-shadow: 0 0 8px rgba(255, 59, 48, 0.1);
+}
+
+/* ---- 浅色模式细节 ---- */
+[data-theme="light-modern"] .detail-drag-handle {
+  background: rgba(0, 0, 0, 0.15);
+}
+[data-theme="light-modern"] .detail-drag-handle:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+[data-theme="light-modern"] .drawer-close {
+  background: rgba(0, 0, 0, 0.06);
+}
+[data-theme="light-modern"] .drawer-close:hover {
+  background: rgba(255, 59, 48, 0.15);
+  color: #FF3B30;
+}
+
+/* ---- 浅色模式：sweep 光带动画中性色 ---- */
+[data-theme="light-modern"] .node,
+[data-theme="light-modern"] .package,
+[data-theme="light-modern"] .group,
+[data-theme="light-modern"] .log-item,
+[data-theme="light-modern"] .sink-item {
+  --race-color: rgba(0, 0, 0, 0.25);
+}

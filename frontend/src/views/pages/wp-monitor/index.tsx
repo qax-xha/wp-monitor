@@ -14,7 +14,8 @@ import {
 } from "@/views/components/monitor/flowHelpers";
 import TimeSeriesChart from "@/views/components/monitor/TimeSeriesChart";
 import ScopeTrendPanel from "@/views/components/monitor/ScopeTrendPanel";
-import { MONITOR_SERIES_PALETTE } from "@/views/components/monitor/chartPalette";
+import ThemeSwitcher from "@/views/components/monitor/ThemeSwitcher";
+import { getPalette } from "@/views/components/monitor/chartPalette";
 import {
   exportMissedLogs,
   fetchMissedLogs,
@@ -31,8 +32,8 @@ import type {
   NodeTimeSeries,
   VlogRecord,
 } from "@/types/monitor";
+import { useTheme } from "@/context/ThemeContext";
 import logoUrl from "@/assets/logo.svg";
-import "./index.css";
 
 const QUICK_RANGES = [
   { key: "1m", label: "最近 1 分钟", minutes: 1 },
@@ -167,6 +168,7 @@ function buildQuickRange(key: string) {
 }
 
 export default function WpMonitorPage() {
+  const { theme, accentColor } = useTheme();
   const formatRate2 = useCallback((v: number) => `${v.toFixed(2)} e/s`, []);
 
   const [appVersion, setAppVersion] = useState("");
@@ -394,16 +396,17 @@ export default function WpMonitorPage() {
         color: (() => {
           const cached = scopeSeriesColorMapRef.current.get(seriesItem.node_id);
           if (cached) return cached;
+          const palette = getPalette(theme);
           const color =
-            MONITOR_SERIES_PALETTE[
-            scopeSeriesColorCursorRef.current % MONITOR_SERIES_PALETTE.length
+            palette[
+            scopeSeriesColorCursorRef.current % palette.length
             ];
           scopeSeriesColorMapRef.current.set(seriesItem.node_id, color);
           scopeSeriesColorCursorRef.current += 1;
           return color;
         })(),
       })),
-    [parseSeriesList],
+    [parseSeriesList, theme],
   );
   const visibleParseMultiSeries = useMemo(
     () =>
@@ -627,6 +630,11 @@ export default function WpMonitorPage() {
   useEffect(() => {
     setParseSearchActiveIndex(0);
   }, [parseQuery, parseSearchOpen]);
+
+  useEffect(() => {
+    scopeSeriesColorMapRef.current.clear();
+    scopeSeriesColorCursorRef.current = 0;
+  }, [theme]);
 
   useEffect(() => {
     setHiddenScopeSeriesNames((prev) =>
@@ -1161,6 +1169,7 @@ export default function WpMonitorPage() {
             />
             <span className="wd-refresh-unit">s</span>
           </span>
+          <ThemeSwitcher />
         </div>
       </div>
       <div className="canvas" id="canvas">
@@ -1523,7 +1532,7 @@ export default function WpMonitorPage() {
         </div>
         <div className="detail-panel-head">
           <div className="detail-panel-head-left">
-            <Typography.Text style={{ fontSize: 13, fontFamily: "var(--font-mono)", color: "var(--accent)" }}>节点详情</Typography.Text>
+            <Typography.Text style={{ fontSize: 13, fontFamily: "var(--font-mono)", color: "var(--detail-heading-color, var(--accent))" }}>节点详情</Typography.Text>
             {detailNodePill && (
               <span className={`detail-node-pill detail-node-pill--${detailNodePillType}`}>
                 {detailNodePill}
@@ -1566,6 +1575,7 @@ export default function WpMonitorPage() {
                 detailTrendAutoRefresh={detailTrendAutoRefresh}
                 detailStartTime={detailStartTime}
                 detailEndTime={detailEndTime}
+                accentColor={accentColor}
                 onToggleAutoRefresh={() =>
                   setDetailTrendAutoRefresh((prev) => !prev)
                 }
@@ -1645,7 +1655,7 @@ export default function WpMonitorPage() {
                     <TimeSeriesChart
                       title="速率趋势"
                       points={rateChartPoints}
-                      color="#e44d26"
+                      color={accentColor}
                       showTitleValue={false}
                       valueFormatter={formatRate2}
                       axisValueFormatter={formatRate2}
