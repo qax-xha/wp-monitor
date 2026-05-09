@@ -9,37 +9,54 @@
   --accent-glow: rgba(228, 77, 38, 0.2);
   --accent-soft: rgba(228, 77, 38, 0.07);
   --border-subtle: rgba(228, 77, 38, 0.08);
-
-  --source-color: #e44d26;
-  --source-rgb: 228, 77, 38;
-  --source-bg: rgba(228, 77, 38, 0.08);
-  --source-border: rgba(228, 77, 38, 0.75);
-
-  --package-color: #e44d26;
-  --package-rgb: 228, 77, 38;
-  --package-bg: rgba(228, 77, 38, 0.08);
-  --package-border: rgba(228, 77, 38, 0.75);
-
-  --log-color: #e44d26;
-  --log-rgb: 228, 77, 38;
-  --log-bg: rgba(228, 77, 38, 0.04);
-  --log-border: rgba(228, 77, 38, 0.45);
-
-  --group-color: #faa918;
-  --group-rgb: 250, 169, 24;
-  --group-bg: rgba(250, 169, 24, 0.08);
-  --group-border: rgba(250, 169, 24, 0.75);
-
-  --sink-color: #faa918;
-  --sink-rgb: 250, 169, 24;
-  --sink-bg: rgba(250, 169, 24, 0.04);
-  --sink-border: rgba(250, 169, 24, 0.45);
-
-  --miss-color: #e04848;
-  --miss-rgb: 224, 72, 72;
-  --miss-bg: rgba(224, 72, 72, 0.08);
-  --miss-border: rgba(224, 72, 72, 0.55);
-  --miss-text-light: #e8a0a0;
-  --miss-border-style: dashed;
   --detail-heading-color: #fcd9c6;
+  --miss-border-style: dashed;
+  --close-hover-bg: rgba(224, 72, 72, 0.2);
+  --close-hover-color: #e8a0a0;
+}
+
+[data-theme="dark-modern"] .node--source {
+  --node-accent: #e44d26;
+  --node-accent-rgb: 228, 77, 38;
+  --node-bg: rgba(228, 77, 38, 0.08);
+  --node-border: rgba(228, 77, 38, 0.75);
+  --node-title-color: #fcd9c6;
+}
+
+[data-theme="dark-modern"] .node--package {
+  --node-accent: #e44d26;
+  --node-accent-rgb: 228, 77, 38;
+  --node-bg: rgba(228, 77, 38, 0.08);
+  --node-border: rgba(228, 77, 38, 0.75);
+  --node-title-color: #e44d26;
+}
+
+[data-theme="dark-modern"] .node--group {
+  --node-accent: #faa918;
+  --node-accent-rgb: 250, 169, 24;
+  --node-bg: rgba(250, 169, 24, 0.08);
+  --node-border: rgba(250, 169, 24, 0.75);
+  --node-title-color: #faa918;
+}
+
+[data-theme="dark-modern"] .node--miss {
+  --node-accent: #e04848;
+  --node-accent-rgb: 224, 72, 72;
+  --node-bg: rgba(224, 72, 72, 0.08);
+  --node-border: rgba(224, 72, 72, 0.55);
+  --node-title-color: var(--text-main);
+}
+
+[data-theme="dark-modern"] .node__leaf--log {
+  --leaf-accent: #e44d26;
+  --leaf-accent-rgb: 228, 77, 38;
+  --leaf-bg: rgba(228, 77, 38, 0.04);
+  --leaf-border: rgba(228, 77, 38, 0.45);
+}
+
+[data-theme="dark-modern"] .node__leaf--sink {
+  --leaf-accent: #faa918;
+  --leaf-accent-rgb: 250, 169, 24;
+  --leaf-bg: rgba(250, 169, 24, 0.04);
+  --leaf-border: rgba(250, 169, 24, 0.45);
 }

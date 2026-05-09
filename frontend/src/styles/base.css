@@ -354,7 +354,7 @@ body::before {
   min-height: 0;
 }
 
-/* ===== Card & Node ===== */
+/* ===== Card ===== */
 .card {
   background: var(--surface-raised);
   backdrop-filter: blur(12px);
@@ -363,48 +363,66 @@ body::before {
   transition: border-color .2s ease, box-shadow .2s ease;
 }
 .card:hover { border-color: rgba(var(--accent-rgb), 0.35); }
-.node {
-  padding: 10px;
-  color: var(--text-main);
-  border: 1px solid var(--source-border);
-  cursor: pointer;
-  background: var(--source-bg);
-  border-radius: var(--radius-lg);
-  position: relative;
-  overflow: hidden;
-  --race-color: var(--source-color);
-}
-.node + .node { margin-top: 10px; }
-.node:hover {
-  border-color: var(--source-color);
-  box-shadow: 0 0 10px rgba(var(--source-rgb), 0.25);
-}
-.node-name {
-  font-size: 14px;
-  font-weight: 600;
-  font-family: var(--font-mono);
-  margin-bottom: 3px;
-  color: var(--node-name-color);
-}
-.node-sub { font-size: 12px; opacity: .8; margin-bottom: 6px; }
 
-/* ===== Package Card ===== */
-.package {
-  background: var(--package-bg);
-  border: 1px solid var(--package-border);
-  border-radius: var(--radius-lg);
+/* ===== Node（三列统一卡片）===== */
+.node {
   padding: 12px;
   margin-bottom: 14px;
+  color: var(--text-main);
   cursor: pointer;
   position: relative;
   overflow: hidden;
-  --race-color: var(--package-color);
+  border: 1px solid var(--node-border);
+  background: var(--node-bg);
+  border-radius: var(--radius-lg);
+  --race-color: var(--node-accent);
+  transition: all .2s linear;
 }
-.package:hover {
-  border-color: var(--package-color);
-  box-shadow: 0 0 10px rgba(var(--package-rgb), 0.25);
+.node:hover {
+  border-color: var(--node-accent);
+  box-shadow: 0 0 10px rgba(var(--node-accent-rgb), 0.25);
 }
-.package-head {
+.node.selected {
+  border-color: var(--node-accent);
+  border-width: 2px;
+  box-shadow: 0 0 8px rgba(var(--node-accent-rgb), 0.3),
+              inset 0 0 8px rgba(var(--node-accent-rgb), 0.1);
+  background: rgba(var(--node-accent-rgb), 0.12);
+}
+.node--source {
+  padding: 10px;
+  margin-bottom: 0;
+}
+.node--source + .node--source { margin-top: 10px; }
+.node--miss {
+  border-style: var(--miss-border-style, dashed);
+}
+.node--miss::before { display: none; }
+.node--miss:hover { box-shadow: 0 0 14px rgba(var(--node-accent-rgb), 0.12); }
+.node--miss-alert {
+  background: var(--node-bg);
+  border-color: var(--node-border);
+  color: var(--text-main);
+}
+.node--miss-muted {
+  background: var(--lane-bg);
+  border-color: var(--node-border);
+  color: var(--text-sub);
+}
+.node__sub { font-size: 12px; opacity: .8; margin-bottom: 6px; }
+
+/* ---- 父节点含选中子节点时高亮 ---- */
+.node--package:has(.node__leaf.selected),
+.node--group:has(.node__leaf.selected) {
+  border-color: var(--node-accent);
+  border-width: 2px;
+  box-shadow: 0 0 8px rgba(var(--node-accent-rgb), 0.3),
+              inset 0 0 8px rgba(var(--node-accent-rgb), 0.1);
+  background: rgba(var(--node-accent-rgb), 0.12);
+}
+
+/* ===== Node Header（可展开节点）===== */
+.node__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -414,56 +432,78 @@ body::before {
   margin: -4px -8px;
   transition: background .15s ease;
 }
-.package-head:hover { background: rgba(var(--package-rgb), 0.06); }
-.package-head-main { display: flex; flex-direction: column; gap: 2px; }
-.package-title { font-size: 16px; font-weight: 700; color: var(--package-color); }
-.package-title-clickable { cursor: pointer; transition: color .2s ease; }
-.package-title-clickable:hover { color: color-mix(in srgb, var(--package-color) 80%, white); }
-.package-summary {
+.node__header:hover { background: rgba(var(--node-accent-rgb), 0.06); }
+.node--group .node__header {
+  padding: 0;
+  margin: 0;
+}
+
+/* ===== Node Title ===== */
+.node__title {
+  font-size: 14px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  margin-bottom: 3px;
+  color: var(--node-title-color);
+}
+.node--package .node__title,
+.node--group .node__title {
+  font-size: 16px;
+  font-weight: 700;
+  font-family: var(--font-main);
+  margin-bottom: 0;
+  cursor: pointer;
+  transition: color .2s ease;
+}
+.node--package .node__title:hover,
+.node--group .node__title:hover {
+  color: color-mix(in srgb, var(--node-accent) 80%, white);
+}
+.node--miss .node__title { margin-bottom: 0; }
+
+/* ===== Node Summary ===== */
+.node__summary {
   font-size: 13px;
   color: var(--text-sub);
   margin-top: 3px;
   font-family: var(--font-mono);
 }
-.log-list {
-  max-height: 430px;
+
+/* ===== Node Children ===== */
+.node__children {
   overflow-y: auto;
   padding: 5px 12px 0 8px;
   margin-top: 8px;
 }
+.node--package .node__children { max-height: 430px; }
+.node--group .node__children { max-height: 340px; }
 
-/* ===== Log & Sink Items ===== */
-.log-item {
-  background: transparent;
-  border: 1px solid var(--log-border);
+/* ===== Node Leaf（子节点）===== */
+.node__leaf {
+  border: 1px solid var(--leaf-border);
+  background: var(--leaf-bg);
   border-radius: var(--radius-sm);
   padding: 9px;
   margin-bottom: 10px;
   cursor: pointer;
   transition: border-color .18s ease;
   position: relative;
-  --race-color: var(--log-color);
+  --race-color: var(--leaf-accent);
 }
-.log-item:hover {
-  border-color: var(--log-color);
-  box-shadow: 0 0 8px rgba(var(--log-rgb), 0.12);
+.node__leaf:hover {
+  border-color: var(--leaf-accent);
+  box-shadow: 0 0 8px rgba(var(--leaf-accent-rgb), 0.12);
 }
-.sink-item {
-  background: var(--sink-bg);
-  border: 1px solid var(--sink-border);
-  border-radius: var(--radius-sm);
-  padding: 9px;
-  margin-bottom: 10px;
-  cursor: pointer;
-  transition: border-color .18s ease;
-  position: relative;
-  --race-color: var(--sink-color);
+.node__leaf.selected {
+  border-color: var(--leaf-accent);
+  border-width: 2px;
+  box-shadow: 0 0 6px rgba(var(--leaf-accent-rgb), 0.25),
+              inset 0 0 6px rgba(var(--leaf-accent-rgb), 0.08);
+  background: rgba(var(--leaf-accent-rgb), 0.1);
 }
-.sink-item:hover {
-  border-color: var(--sink-color);
-  box-shadow: 0 0 8px rgba(var(--sink-rgb), 0.14);
-}
-.item-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+
+/* ---- 叶子项内部布局 ---- */
+.node__leaf-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .metric-inline-badges { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .metric-inline-badge {
   border: 1px solid rgba(var(--accent-rgb), 0.28);
@@ -477,108 +517,8 @@ body::before {
   font-weight: 600;
 }
 
-/* ===== Group Card ===== */
-.group {
-  background: var(--group-bg);
-  border: 1px solid var(--group-border);
-  border-radius: var(--radius-lg);
-  padding: 12px;
-  margin-bottom: 14px;
-  cursor: pointer;
-  position: relative;
-  overflow: hidden;
-  --race-color: var(--group-color);
-}
-.group:hover {
-  border-color: var(--group-color);
-  box-shadow: 0 0 10px rgba(var(--group-rgb), 0.18);
-}
-.group-head { display: flex; align-items: center; justify-content: space-between; }
-.group-head-main { display: flex; flex-direction: column; gap: 2px; }
-.group-title { font-size: 16px; font-weight: 700; color: var(--group-color); }
-.group-title-clickable { cursor: pointer; transition: color .2s ease; }
-.group-title-clickable:hover { color: color-mix(in srgb, var(--group-color) 80%, white); }
-.sink-list {
-  max-height: 340px;
-  overflow-y: auto;
-  padding: 5px 12px 0 8px;
-  margin-top: 8px;
-}
-
-/* ===== MISS ===== */
-.miss { border-style: var(--miss-border-style, dashed); }
-.miss::before { display: none; }
-.miss-alert {
-  background: var(--miss-bg);
-  border-color: var(--miss-border);
-  color: var(--text-main);
-}
-.miss-alert:hover { box-shadow: 0 0 14px rgba(var(--miss-rgb), 0.12); }
-.miss-muted {
-  background: var(--lane-bg);
-  border-color: var(--miss-border);
-  color: var(--text-sub);
-}
-
-/* ===== Selected State ===== */
-.node.selected {
-  border-color: var(--source-color);
-  border-width: 2px;
-  box-shadow: 0 0 8px rgba(var(--source-rgb), 0.3),
-              inset 0 0 8px rgba(var(--source-rgb), 0.1);
-  background: rgba(var(--source-rgb), 0.12);
-}
-.package.selected {
-  border-color: var(--package-color);
-  border-width: 2px;
-  box-shadow: 0 0 8px rgba(var(--package-rgb), 0.3),
-              inset 0 0 8px rgba(var(--package-rgb), 0.1);
-  background: rgba(var(--package-rgb), 0.12);
-}
-.group.selected {
-  border-color: var(--group-color);
-  border-width: 2px;
-  box-shadow: 0 0 8px rgba(var(--group-rgb), 0.3),
-              inset 0 0 8px rgba(var(--group-rgb), 0.1);
-  background: rgba(var(--group-rgb), 0.12);
-}
-.log-item.selected {
-  border-color: var(--log-color);
-  border-width: 2px;
-  box-shadow: 0 0 6px rgba(var(--log-rgb), 0.25),
-              inset 0 0 6px rgba(var(--log-rgb), 0.08);
-  background: rgba(var(--log-rgb), 0.1);
-}
-.sink-item.selected {
-  border-color: var(--sink-color);
-  border-width: 2px;
-  box-shadow: 0 0 6px rgba(var(--sink-rgb), 0.25),
-              inset 0 0 6px rgba(var(--sink-rgb), 0.08);
-  background: rgba(var(--sink-rgb), 0.1);
-}
-.miss.selected {
-  border-color: var(--miss-color);
-  border-width: 2px;
-  box-shadow: 0 0 8px rgba(var(--miss-rgb), 0.3),
-              inset 0 0 8px rgba(var(--miss-rgb), 0.1);
-}
-.package:has(.log-item.selected) {
-  border-color: var(--package-color);
-  border-width: 2px;
-  box-shadow: 0 0 8px rgba(var(--package-rgb), 0.3),
-              inset 0 0 8px rgba(var(--package-rgb), 0.1);
-  background: rgba(var(--package-rgb), 0.12);
-}
-.group:has(.sink-item.selected) {
-  border-color: var(--group-color);
-  border-width: 2px;
-  box-shadow: 0 0 8px rgba(var(--group-rgb), 0.3),
-              inset 0 0 8px rgba(var(--group-rgb), 0.1);
-  background: rgba(var(--group-rgb), 0.12);
-}
-
 /* ===== Glow Sweep ===== */
-.node::after, .package::after, .group::after {
+.node::after {
   content: '';
   position: absolute;
   bottom: 0;
@@ -591,7 +531,7 @@ body::before {
   transition: opacity .25s ease;
   pointer-events: none;
 }
-.node.sweep::after, .package.sweep::after, .group.sweep::after {
+.node.sweep::after {
   opacity: 1;
   animation: sweep-bottom 1.2s ease-in-out forwards;
 }
@@ -662,7 +602,7 @@ body::before {
   justify-content: center;
   transition: all .2s ease;
 }
-.drawer-close:hover { background: rgba(var(--miss-rgb), 0.2); color: #e8a0a0; }
+.drawer-close:hover { background: var(--close-hover-bg, rgba(var(--accent-rgb), 0.2)); color: var(--close-hover-color, #e8a0a0); }
 .detail-panel-body { padding: 8px; overflow: auto; flex: 1 1 auto; }
 .detail-panel-body p { color: var(--text-sub); font-size: 13px; }
 
