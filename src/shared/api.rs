@@ -22,3 +22,9 @@ impl<T> ApiResponse<T> {
 pub struct ReadyResponse {
     pub status: String,
 }
+
+/// 项目版本信息返回结构。
+#[derive(Debug, serde::Serialize)]
+pub struct VersionResponse {
+    pub version: String,
+}

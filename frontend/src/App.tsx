@@ -1,5 +1,5 @@
-import PagesIndex from './pages';
+import { Outlet } from 'react-router';
 
 export default function App() {
-  return <PagesIndex />;
+  return <Outlet />;
 }

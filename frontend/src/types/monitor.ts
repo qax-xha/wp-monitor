@@ -118,3 +118,7 @@ export interface ApiResp<T> {
   message: string;
   data: T;
 }
+
+export interface VersionInfo {
+  version: string;
+}
