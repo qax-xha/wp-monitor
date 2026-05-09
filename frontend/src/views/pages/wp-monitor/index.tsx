@@ -1347,7 +1347,7 @@ export default function WpMonitorPage() {
                             <article
                               key={logItem.id}
                               className={nodeClass(
-                                "log-item card",
+                                "log-item",
                                 logItem.id,
                                 "log",
                               )}

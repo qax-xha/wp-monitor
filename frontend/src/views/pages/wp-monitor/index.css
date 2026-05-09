@@ -19,7 +19,7 @@
   --package-color: #e44d26; --package-bg: rgba(228,77,38,0.08); --package-border: rgba(228,77,38,0.75);
   --group-color: #faa918; --group-bg: rgba(250,169,24,0.08); --group-border: rgba(250,169,24,0.75);
   --miss-color: #e04848; --miss-bg: rgba(224,72,72,0.08); --miss-border: rgba(224,72,72,0.55);
-  --log-color: #e44d26; --log-bg: rgba(228,77,38,0.04); --log-border: rgba(228,77,38,0.55);
+  --log-color: #e44d26; --log-bg: rgba(60, 59, 59, 0.08); --log-border:rgba(161, 161, 152, 0.907) ;
   --sink-color: #faa918; --sink-bg: rgba(250,169,24,0.04); --sink-border: rgba(250,169,24,0.55);
   --success: #4dab6a;
 }
@@ -103,7 +103,7 @@ body { margin:0; font-family:var(--font-main); color:var(--text-main); backgroun
 .node { padding:10px; color:var(--text-main); border:1px solid var(--source-border); cursor:pointer; background:var(--source-bg); border-radius:var(--radius-lg); position:relative; overflow:hidden; --race-color:var(--source-color) }
 .node+.node { margin-top:10px }
 .node:hover { border-color:var(--source-color); box-shadow:0 0 10px rgba(228,77,38,0.25) }
-.node-name { font-size:14px; font-weight:600; font-family: 'Courier New', Courier, monospace; margin-bottom:3px; color:#fcd9c6 }
+.node-name { font-size:14px; font-weight:600; font-family:var(--font-mono); margin-bottom:3px; color:#fcd9c6 }
 .node-sub { font-size:12px; opacity:.8; margin-bottom:6px }
 
 /* ===== Package Card ===== */
@@ -119,7 +119,7 @@ body { margin:0; font-family:var(--font-main); color:var(--text-main); backgroun
 .log-list { max-height:430px; overflow-y:scroll; padding:5px 12px 0 8px; margin-top:8px }
 
 /* ===== Log & Sink Items ===== */
-.log-item { background:var(--log-bg); border:1px solid var(--log-border); border-radius:var(--radius-sm); padding:9px; margin-bottom:10px; cursor:pointer; transition:border-color .18s ease; position:relative; --race-color:var(--log-color) }
+.log-item { background:transparent; border:1px solid var(--log-border); border-radius:var(--radius-sm); padding:9px; margin-bottom:10px; cursor:pointer; transition:border-color .18s ease; position:relative; --race-color:var(--log-color) }
 .log-item:hover { border-color:var(--log-color); box-shadow:0 0 8px rgba(228,77,38,0.12) }
 .sink-item { background:var(--sink-bg); border:1px solid var(--sink-border); border-radius:var(--radius-sm); padding:9px; margin-bottom:10px; cursor:pointer; transition:border-color .18s ease; position:relative; --race-color:var(--sink-color) }
 .sink-item:hover { border-color:var(--sink-color); box-shadow:0 0 8px rgba(250,169,24,0.14) }
