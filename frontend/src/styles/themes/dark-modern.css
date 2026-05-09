@@ -28,7 +28,7 @@
   --node-accent-rgb: 228, 77, 38;
   --node-bg: rgba(228, 77, 38, 0.08);
   --node-border: rgba(228, 77, 38, 0.75);
-  --node-title-color: #e44d26;
+  --node-title-color: #dfd4d4;
 }
 
 [data-theme="dark-modern"] .node--group {
@@ -51,7 +51,12 @@
   --leaf-accent: #e44d26;
   --leaf-accent-rgb: 228, 77, 38;
   --leaf-bg: rgba(228, 77, 38, 0.04);
-  --leaf-border: rgba(228, 77, 38, 0.45);
+  --leaf-border: rgba(228, 77, 38, 0.25);
+}
+
+[data-theme="dark-modern"] .node__leaf--log .node__title,
+[data-theme="dark-modern"] .node__leaf--log .metric-inline-badge {
+  color: #e6ddd8;
 }
 
 [data-theme="dark-modern"] .node__leaf--sink {
