@@ -17,6 +17,7 @@ interface ScopeTrendPanelProps {
   detailTrendAutoRefresh: boolean;
   detailStartTime: string;
   detailEndTime: string;
+  accentColor: string;
   onToggleAutoRefresh: () => void;
   onToggleSeries: (name: string) => void;
   formatRate2: (value: number) => string;
@@ -31,6 +32,7 @@ export default function ScopeTrendPanel({
   detailTrendAutoRefresh,
   detailStartTime,
   detailEndTime,
+  accentColor,
   onToggleAutoRefresh,
   onToggleSeries,
   formatRate2,
@@ -44,7 +46,7 @@ export default function ScopeTrendPanel({
           <Divider orientation="vertical" style={{ margin: "0 2px", borderColor: "rgba(228,77,38,0.18)" }} />
           <Space size={4}>
             <Typography.Text style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-sub)" }}>采样间隔</Typography.Text>
-            <Typography.Text style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--accent)" }}>
+            <Typography.Text style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--detail-heading-color, var(--accent))" }}>
               {parseSeriesList[0]?.step_secs
                 ? `${parseSeriesList[0].step_secs}s`
                 : "--"}
@@ -52,7 +54,7 @@ export default function ScopeTrendPanel({
           </Space>
           <Space size={4}>
             <Typography.Text style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-sub)" }}>统计窗口</Typography.Text>
-            <Typography.Text style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--accent)" }}>
+            <Typography.Text style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--detail-heading-color, var(--accent))" }}>
               {parseSeriesList[0]?.rate_window_secs
                 ? `${parseSeriesList[0].rate_window_secs}s`
                 : "--"}
@@ -98,7 +100,7 @@ export default function ScopeTrendPanel({
                       width: 6,
                       height: 6,
                       borderRadius: "50%",
-                      background: hidden ? "var(--text-muted)" : (line.color ?? "#e44d26"),
+                      background: hidden ? "var(--text-muted)" : (line.color ?? accentColor),
                       flexShrink: 0,
                     }}
                   />
@@ -114,7 +116,7 @@ export default function ScopeTrendPanel({
         points={[]}
         multiSeries={visibleParseMultiSeries}
         showLegend={false}
-        color="#e44d26"
+        color={accentColor}
         showTitleValue={false}
         valueFormatter={formatRate2}
         axisValueFormatter={formatRate2}

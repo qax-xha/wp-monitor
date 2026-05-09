@@ -14,7 +14,8 @@ import {
 } from "@/views/components/monitor/flowHelpers";
 import TimeSeriesChart from "@/views/components/monitor/TimeSeriesChart";
 import ScopeTrendPanel from "@/views/components/monitor/ScopeTrendPanel";
-import { MONITOR_SERIES_PALETTE } from "@/views/components/monitor/chartPalette";
+import ThemeSwitcher from "@/views/components/monitor/ThemeSwitcher";
+import { getPalette } from "@/views/components/monitor/chartPalette";
 import {
   exportMissedLogs,
   fetchMissedLogs,
@@ -31,8 +32,9 @@ import type {
   NodeTimeSeries,
   VlogRecord,
 } from "@/types/monitor";
-import logoUrl from "@/assets/logo.svg";
-import "./index.css";
+import { useTheme } from "@/context/ThemeContext";
+import logoDarkUrl from "@/assets/logo-dark.png";
+import logoLightUrl from "@/assets/logo-light.png";
 
 const QUICK_RANGES = [
   { key: "1m", label: "最近 1 分钟", minutes: 1 },
@@ -167,6 +169,8 @@ function buildQuickRange(key: string) {
 }
 
 export default function WpMonitorPage() {
+  const { theme, accentColor } = useTheme();
+  const logoUrl = theme === 'light-modern' ? logoLightUrl : logoDarkUrl;
   const formatRate2 = useCallback((v: number) => `${v.toFixed(2)} e/s`, []);
 
   const [appVersion, setAppVersion] = useState("");
@@ -342,7 +346,7 @@ export default function WpMonitorPage() {
         selectedNode &&
         !detailPanelRef.current?.contains(target) &&
         !(target as Element).closest(
-          ".node, .package, .group, .log-item, .sink-item, .miss, .lane-title",
+          ".node, .node__leaf, .lane-title",
         )
       ) {
         setSelectedNode("");
@@ -394,16 +398,17 @@ export default function WpMonitorPage() {
         color: (() => {
           const cached = scopeSeriesColorMapRef.current.get(seriesItem.node_id);
           if (cached) return cached;
+          const palette = getPalette(theme);
           const color =
-            MONITOR_SERIES_PALETTE[
-            scopeSeriesColorCursorRef.current % MONITOR_SERIES_PALETTE.length
+            palette[
+            scopeSeriesColorCursorRef.current % palette.length
             ];
           scopeSeriesColorMapRef.current.set(seriesItem.node_id, color);
           scopeSeriesColorCursorRef.current += 1;
           return color;
         })(),
       })),
-    [parseSeriesList],
+    [parseSeriesList, theme],
   );
   const visibleParseMultiSeries = useMemo(
     () =>
@@ -627,6 +632,11 @@ export default function WpMonitorPage() {
   useEffect(() => {
     setParseSearchActiveIndex(0);
   }, [parseQuery, parseSearchOpen]);
+
+  useEffect(() => {
+    scopeSeriesColorMapRef.current.clear();
+    scopeSeriesColorCursorRef.current = 0;
+  }, [theme]);
 
   useEffect(() => {
     setHiddenScopeSeriesNames((prev) =>
@@ -1161,6 +1171,7 @@ export default function WpMonitorPage() {
             />
             <span className="wd-refresh-unit">s</span>
           </span>
+          <ThemeSwitcher />
         </div>
       </div>
       <div className="canvas" id="canvas">
@@ -1198,12 +1209,12 @@ export default function WpMonitorPage() {
                 {snapshot.sources.map((node) => (
                   <article
                     key={node.id}
-                    className={nodeClass("node card source", node.id, "source")}
+                    className={nodeClass("node node--source", node.id, "source")}
                     onMouseEnter={() => { setHoveredNode(node.id); setSweepNode(node.id); }}
                     onMouseLeave={() => { setHoveredNode(""); setSweepNode(""); }}
                     onClick={() => void openDetail(node.id)}
                   >
-                    <div className="node-name">{node.name}</div>
+                    <div className="node__title">{node.name}</div>
                     <div className="metric-badges">
                       <span className="metric-badge">速率 {fmtRate(node.metrics.log_rate_eps)}</span>
                       <span className="metric-badge">数量 {fmtCount(node.metrics.log_count)}</span>
@@ -1308,7 +1319,7 @@ export default function WpMonitorPage() {
                   return (
                     <section
                       key={parseItem.id}
-                      className={nodeClass("package card", parseItem.id, "package")}
+                      className={nodeClass("node node--package", parseItem.id, "package")}
                       onMouseEnter={(e) => {
                         setHoveredNode(parseItem.id);
                         const related = e.relatedTarget as Element | null;
@@ -1319,12 +1330,12 @@ export default function WpMonitorPage() {
                       onMouseLeave={() => { setHoveredNode(""); setSweepNode(""); }}
                       onClick={handlePackageClick}
                     >
-                      <div className="package-head">
-                        <div className="package-head-main">
-                          <div className="package-title package-title-clickable">
+                      <div className="node__header">
+                        <div>
+                          <div className="node__title">
                             {parseItem.package_name}
                           </div>
-                          <div className="package-summary">
+                          <div className="node__summary">
                             {fmtRate(parseItem.metrics.log_rate_eps)} /{" "}
                             {fmtCount(parseItem.metrics.log_count)} (汇总) ·{" "}
                             {parseItem.logs.length} 个日志类型
@@ -1342,12 +1353,12 @@ export default function WpMonitorPage() {
                         />
                       </div>
                       {isExpanded && (
-                        <div className="log-list">
+                        <div className="node__children">
                           {parseItem.logs.map((logItem) => (
                             <article
                               key={logItem.id}
                               className={nodeClass(
-                                "log-item card",
+                                "node__leaf node__leaf--log",
                                 logItem.id,
                                 "log",
                               )}
@@ -1358,8 +1369,8 @@ export default function WpMonitorPage() {
                                 void openDetail(logItem.id);
                               }}
                             >
-                              <div className="item-head">
-                                <div className="node-name">{logItem.name}</div>
+                              <div className="node__leaf-head">
+                                <div className="node__title">{logItem.name}</div>
                                 <div className="metric-inline-badges">
                                   <span className="metric-inline-badge">
                                     速率 {fmtRate(logItem.metrics.log_rate_eps)}
@@ -1379,7 +1390,7 @@ export default function WpMonitorPage() {
 
                 <article
                   className={nodeClass(
-                    `node card miss ${missHasData ? "miss-alert" : "miss-muted"}`,
+                    `node node--miss ${missHasData ? "node--miss-alert" : "node--miss-muted"}`,
                     snapshot.miss.id,
                     "miss",
                   )}
@@ -1388,13 +1399,13 @@ export default function WpMonitorPage() {
                   onClick={() => void openDetail(snapshot.miss.id)}
                 >
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                    <div className="node-name" style={{ marginBottom: 0 }}>{snapshot.miss.name}</div>
+                    <div className="node__title" style={{ marginBottom: 0 }}>{snapshot.miss.name}</div>
                     <div className="metric-badges" style={{ marginTop: 0 }}>
                       <span className="metric-badge">速率 {fmtRate(snapshot.miss.metrics.log_rate_eps)}</span>
                       <span className="metric-badge">数量 {fmtCount(snapshot.miss.metrics.log_count)}</span>
                     </div>
                   </div>
-                  <div className="node-sub">未命中任何 WPL 规则 · 不流向任何输出</div>
+                  <div className="node__sub">未命中任何 WPL 规则 · 不流向任何输出</div>
                 </article>
               </div>
             </section>
@@ -1437,7 +1448,7 @@ export default function WpMonitorPage() {
                   return (
                     <section
                       key={group.id}
-                      className={nodeClass("group card", group.id, "group")}
+                      className={nodeClass("node node--group", group.id, "group")}
                       onMouseEnter={(e) => {
                         setHoveredNode(group.id);
                         const related = e.relatedTarget as Element | null;
@@ -1448,12 +1459,12 @@ export default function WpMonitorPage() {
                       onMouseLeave={() => { setHoveredNode(""); setSweepNode(""); }}
                       onClick={handleGroupClick}
                     >
-                      <div className="group-head">
-                        <div className="group-head-main">
-                          <div className="group-title group-title-clickable">
+                      <div className="node__header">
+                        <div>
+                          <div className="node__title">
                             {group.sink_group}
                           </div>
-                          <div className="package-summary">
+                          <div className="node__summary">
                             {fmtRate(group.metrics.log_rate_eps)} /{" "}
                             {fmtCount(group.metrics.log_count)} · {group.sinks.length}{" "}
                             个输出目标
@@ -1471,12 +1482,12 @@ export default function WpMonitorPage() {
                         />
                       </div>
                       {isExpanded && (
-                        <div className="sink-list">
+                        <div className="node__children">
                           {group.sinks.map((sinkItem) => (
                             <article
                               key={sinkItem.id}
                               className={nodeClass(
-                                "sink-item card",
+                                "node__leaf node__leaf--sink",
                                 sinkItem.id,
                                 "sink",
                               )}
@@ -1484,8 +1495,8 @@ export default function WpMonitorPage() {
                               onMouseLeave={() => setHoveredNode("")}
                               onClick={() => void openDetail(sinkItem.id)}
                             >
-                              <div className="item-head">
-                                <div className="node-name">{sinkItem.sink_name}</div>
+                              <div className="node__leaf-head">
+                                <div className="node__title">{sinkItem.sink_name}</div>
                                 <div className="metric-inline-badges">
                                   <span className="metric-inline-badge">
                                     速率 {fmtRate(sinkItem.metrics.log_rate_eps)}
@@ -1523,7 +1534,7 @@ export default function WpMonitorPage() {
         </div>
         <div className="detail-panel-head">
           <div className="detail-panel-head-left">
-            <Typography.Text style={{ fontSize: 13, fontFamily: "var(--font-mono)", color: "var(--accent)" }}>节点详情</Typography.Text>
+            <Typography.Text style={{ fontSize: 13, fontWeight: 600, fontFamily: "var(--font-mono)", color: "var(--detail-heading-color, var(--accent))" }}>节点详情</Typography.Text>
             {detailNodePill && (
               <span className={`detail-node-pill detail-node-pill--${detailNodePillType}`}>
                 {detailNodePill}
@@ -1566,6 +1577,7 @@ export default function WpMonitorPage() {
                 detailTrendAutoRefresh={detailTrendAutoRefresh}
                 detailStartTime={detailStartTime}
                 detailEndTime={detailEndTime}
+                accentColor={accentColor}
                 onToggleAutoRefresh={() =>
                   setDetailTrendAutoRefresh((prev) => !prev)
                 }
@@ -1645,7 +1657,7 @@ export default function WpMonitorPage() {
                     <TimeSeriesChart
                       title="速率趋势"
                       points={rateChartPoints}
-                      color="#e44d26"
+                      color={accentColor}
                       showTitleValue={false}
                       valueFormatter={formatRate2}
                       axisValueFormatter={formatRate2}

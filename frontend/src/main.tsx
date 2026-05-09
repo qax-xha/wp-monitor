@@ -1,24 +1,34 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { ConfigProvider, App as AntApp, theme } from 'antd';
+import { ConfigProvider, App as AntApp } from 'antd';
 import antdZhCN from 'antd/es/locale/zh_CN';
 import { RouterProvider } from 'react-router';
 import { createRouter } from '@/routes';
-import '@/index.css';
+import { ThemeProvider, useTheme } from '@/context/ThemeContext';
+import '@/styles/index.css';
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
+function AntdConfig({ children }: { children: React.ReactNode }) {
+  const { accentColor, antdAlgorithm } = useTheme();
+  return (
     <ConfigProvider
       theme={{
-        algorithm: theme.darkAlgorithm,
-        token: { colorPrimary: '#e44d26', borderRadius: 6 },
+        algorithm: antdAlgorithm,
+        token: { colorPrimary: accentColor, borderRadius: 6 },
       }}
       componentSize="middle"
       locale={antdZhCN}
     >
-      <AntApp>
-        <RouterProvider router={createRouter({})} />
-      </AntApp>
+      <AntApp>{children}</AntApp>
     </ConfigProvider>
+  );
+}
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <ThemeProvider>
+      <AntdConfig>
+        <RouterProvider router={createRouter({})} />
+      </AntdConfig>
+    </ThemeProvider>
   </StrictMode>,
 );
