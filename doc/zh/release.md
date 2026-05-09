@@ -16,7 +16,7 @@ run.sh
 打开 http://localhost:10428/
 
 
-## 0.4.3
+## 0.6.0
 ### Added
 - 可视化：统一查看 Source、Parse、Sink 处理统计数据
 - MISS 数据观察：识别未命中规则的数据，并支持导出分析。
