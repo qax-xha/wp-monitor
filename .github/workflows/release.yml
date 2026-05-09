@@ -500,7 +500,7 @@ jobs:
             exit 1
           fi
 
-          perl -0pi -e 's/\Q'$OLD_IMAGE'\E/'"$CURRENT_IMAGE"'/g' "$stage_dir/docker-compose.yml"
+          perl -0pi -e 's|\Q$ENV{OLD_IMAGE}\E|$ENV{CURRENT_IMAGE}|g' "$stage_dir/docker-compose.yml"
 
           if ! grep -Fq "$CURRENT_IMAGE" "$stage_dir/docker-compose.yml"; then
             echo "Failed to rewrite image tag in compose" >&2
