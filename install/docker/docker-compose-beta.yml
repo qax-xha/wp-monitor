@@ -2,7 +2,7 @@ services:
   victoria-metrics:
     image: victoriametrics/victoria-metrics:v1.133.0
     ports:
-      - "18439:8428"
+      - "18429:8428"
     volumes:
       # 数据存储目录，按需开启
       - metrics_data:/storage
@@ -34,7 +34,7 @@ services:
   victoria-logs:
     image: victoriametrics/victoria-logs:v1.43.0
     ports:
-      - "19439:9428"
+      - "19429:9428"
     # 数据存储目录,按需开启
     volumes:
       - logs_data:/storage
@@ -69,7 +69,7 @@ services:
     image: "ghcr.io/wp-labs/wp-monitor:v0.6.1-beta" #@gxl:set(images)
     restart: unless-stopped
     ports:
-      - "10528:18080"
+      - "10428:18080"
     environment:
       APP_CONFIG_PATH: /app/config/app.toml
     volumes:
