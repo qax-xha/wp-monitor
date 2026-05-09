@@ -8,7 +8,7 @@ curl -sSf https://get.warpparse.ai/inst-x.sh | bash -s -- monitor-docker beta
 ```
 体验
 ```
-https://github.com/wp-labs/wp-examples.git
+git clone https://github.com/wp-labs/wp-examples.git
 cd  wp-examples/long-demo
 run.sh 
 
