@@ -1,0 +1,62 @@
+[data-theme="dark-modern"] {
+  --accent: #e44d26;
+  --accent-rgb: 228, 77, 38;
+  --accent-dark: #b33a1a;
+  --accent-gradient: linear-gradient(135deg, #e44d26, #b33a1a);
+  --badge-text: #fcd9c6;
+  --node-name-color: #fcd9c6;
+  --title-glow: 0 0 20px rgba(228, 77, 38, 0.15);
+  --accent-glow: rgba(228, 77, 38, 0.2);
+  --accent-soft: rgba(228, 77, 38, 0.07);
+  --border-subtle: rgba(228, 77, 38, 0.08);
+  --detail-heading-color: #fcd9c6;
+  --miss-border-style: dashed;
+  --close-hover-bg: rgba(224, 72, 72, 0.2);
+  --close-hover-color: #e8a0a0;
+}
+
+[data-theme="dark-modern"] .node--source {
+  --node-accent: #e44d26;
+  --node-accent-rgb: 228, 77, 38;
+  --node-bg: rgba(228, 77, 38, 0.08);
+  --node-border: rgba(228, 77, 38, 0.75);
+  --node-title-color: #fcd9c6;
+}
+
+[data-theme="dark-modern"] .node--package {
+  --node-accent: #e44d26;
+  --node-accent-rgb: 228, 77, 38;
+  --node-bg: rgba(228, 77, 38, 0.08);
+  --node-border: rgba(228, 77, 38, 0.75);
+  --node-title-color: #e44d26;
+}
+
+[data-theme="dark-modern"] .node--group {
+  --node-accent: #faa918;
+  --node-accent-rgb: 250, 169, 24;
+  --node-bg: rgba(250, 169, 24, 0.08);
+  --node-border: rgba(250, 169, 24, 0.75);
+  --node-title-color: #faa918;
+}
+
+[data-theme="dark-modern"] .node--miss {
+  --node-accent: #e04848;
+  --node-accent-rgb: 224, 72, 72;
+  --node-bg: rgba(224, 72, 72, 0.08);
+  --node-border: rgba(224, 72, 72, 0.55);
+  --node-title-color: var(--text-main);
+}
+
+[data-theme="dark-modern"] .node__leaf--log {
+  --leaf-accent: #e44d26;
+  --leaf-accent-rgb: 228, 77, 38;
+  --leaf-bg: rgba(228, 77, 38, 0.04);
+  --leaf-border: rgba(228, 77, 38, 0.45);
+}
+
+[data-theme="dark-modern"] .node__leaf--sink {
+  --leaf-accent: #faa918;
+  --leaf-accent-rgb: 250, 169, 24;
+  --leaf-bg: rgba(250, 169, 24, 0.04);
+  --leaf-border: rgba(250, 169, 24, 0.45);
+}
