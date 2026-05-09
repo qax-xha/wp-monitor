@@ -1,0 +1,26 @@
+version = "2.0"
+
+[sink_group]
+name = "miss"
+batch_size = 1
+batch_timeout_ms = 300
+
+[[sink_group.sinks]]
+connect = "file_raw_sink"
+
+[sink_group.sinks.params]
+file = "miss.dat"
+
+[sink_group.sinks.expect]
+max = 0.1
+min = 0.0
+
+# To mirror miss records to VictoriaLogs, uncomment and tune the sink below.
+[[sink_group.sinks]]
+name = "victorialogs_output"
+connect = "victorialogs_sink"
+[sink_group.sinks.params]
+endpoint = "http://127.0.0.1:19429"
+insert_path = "/insert/jsonline"
+flush_interval_secs = 3
+tags = ["wp_stage:miss"]

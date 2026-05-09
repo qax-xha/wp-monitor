@@ -2,13 +2,19 @@
 /target/
 
 # Frontend
+/frontend/dist
 /frontend/node_modules/
 /frontend/.vite/
 /frontend/coverage/
 /frontend/*.tsbuildinfo
+/frontend/.env.local
 
 # Common
 .DS_Store
 
 _gal/.report/
 .run*
+
+# AI
+video-tool/
+.serena/
