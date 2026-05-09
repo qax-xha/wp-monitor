@@ -37,18 +37,27 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          package_json_file: frontend/package.json
+
+      - name: Verify frontend lockfile
+        run: test -f frontend/pnpm-lock.yaml
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
+          cache: 'pnpm'
+          cache-dependency-path: |
+            ./frontend/pnpm-lock.yaml
 
       - name: Build frontend assets
         run: |
           cd frontend
-          npm ci
-          npm run build
+          pnpm install --frozen-lockfile
+          pnpm run build
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -111,18 +120,27 @@ jobs:
           name: ${{ github.event.repository.name }}-${{ github.ref_name }}-aarch64-unknown-linux-gnu
           path: docker-build/arm64-tar
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          package_json_file: frontend/package.json
+
+      - name: Verify frontend lockfile
+        run: test -f frontend/pnpm-lock.yaml
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
+          cache: 'pnpm'
+          cache-dependency-path: |
+            ./frontend/pnpm-lock.yaml
 
       - name: Build frontend assets
         run: |
           cd frontend
-          npm ci
-          npm run build
+          pnpm install --frozen-lockfile
+          pnpm run build
 
       - name: Extract binaries
         run: |
@@ -197,11 +215,11 @@ jobs:
               CHANNEL="beta"
               ;;
             *)
-              CHANNEL="main"
+              CHANNEL="stable"
               ;;
           esac
 
-          COMPOSE_FILE="install/docker/docker-compose-${CHANNEL}.yml"
+          COMPOSE_FILE="dev-ops/docker/${CHANNEL}/docker-compose.yml"
           if [[ ! -f "$COMPOSE_FILE" ]]; then
             echo "Compose file not found: $COMPOSE_FILE" >&2
             exit 1
@@ -390,150 +408,199 @@ jobs:
     permissions:
       contents: read
     env:
-      REMOTE_DIR: /root/wp/wp-monitor/wp-monitor
-      MONITOR_IP: ${{ secrets.MONITOR_IP }}
-      MONITOR_USER: ${{ secrets.MONITOR_USER }}
-      MONITOR_SSH: ${{ secrets.MONITOR_SSH }}
+      WORK_DIR: ${{ vars.WORK_DIR }}
+      HOST_IP: ${{ secrets.HOST_IP }}
+      HOST_USER: ${{ secrets.HOST_USER }}
+      HOST_SSH: ${{ secrets.HOST_SSH }}
+      OLD_IMAGE: ghcr.io/wp-labs/wp-monitor:latest
+      APP_NAME: wp-monitor
+      REGISTRY: ghcr.io
+      IMAGE_NAME: ${{ github.repository }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Resolve compose file
-        id: compose
+      - name: Resolve deploy environment
+        id: deploy
         shell: bash
         run: |
           set -euo pipefail
 
           tag_name="${{ github.ref_name }}"
-
           case "$tag_name" in
             *-alpha)
-              suffix="alpha"
+              deploy_env="alpha"
               ;;
             *-beta)
-              suffix="beta"
+              deploy_env="beta"
               ;;
             *)
-              suffix="main"
+              deploy_env="stable"
               ;;
           esac
 
-          compose_name="docker-compose-${suffix}.yml"
-          local_compose="install/docker/${compose_name}"
-
-          if [ ! -f "$local_compose" ]; then
-            echo "Compose file not found: $local_compose" >&2
+          compose_file="dev-ops/docker/${deploy_env}/docker-compose.yml"
+          if [ ! -f "$compose_file" ]; then
+            echo "Compose file not found: $compose_file" >&2
             exit 1
           fi
 
-          echo "compose_name=$compose_name" >> "$GITHUB_OUTPUT"
+          echo "deploy_env=$deploy_env" >> "$GITHUB_OUTPUT"
 
       - name: Prepare SSH
         shell: bash
         run: |
           set -euo pipefail
 
-          case "$MONITOR_USER" in
+          case "$HOST_USER" in
             ""|*[@[:space:]]*)
-              echo "MONITOR_USER must be a plain username" >&2
+              echo "HOST_USER must be a plain username" >&2
               exit 1
               ;;
           esac
 
-          case "$MONITOR_IP" in
+          case "$HOST_IP" in
             ""|*[@[:space:]]*)
-              echo "MONITOR_IP must be a plain host or IP" >&2
+              echo "HOST_IP must be a plain host or IP" >&2
               exit 1
               ;;
           esac
 
-          if [ -z "${MONITOR_SSH:-}" ]; then
-            echo "MONITOR_SSH is empty" >&2
+          if [ -z "${HOST_SSH:-}" ]; then
+            echo "HOST_SSH is empty" >&2
             exit 1
           fi
 
           rm -rf ~/.ssh
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          printf '%s\n' "$MONITOR_SSH" > ~/.ssh/id_rsa
+          printf '%s\n' "$HOST_SSH" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -T 10 -H "$MONITOR_IP" > ~/.ssh/known_hosts
+          ssh-keyscan -T 10 -H "$HOST_IP" > ~/.ssh/known_hosts
 
           if [ ! -s ~/.ssh/known_hosts ]; then
-            echo "ssh-keyscan returned no host key for $MONITOR_IP" >&2
+            echo "ssh-keyscan returned no host key for $HOST_IP" >&2
             exit 1
           fi
 
-      - name: Ensure remote directory exists
+      - name: Stage deploy files
+        id: stage
+        shell: bash
+        env:
+          DEPLOY_ENV: ${{ steps.deploy.outputs.deploy_env }}
+          CURRENT_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          stage_dir="$(mktemp -d)"
+          cp -R "dev-ops/docker/${DEPLOY_ENV}/." "$stage_dir/"
+
+          if ! grep -Fq "$OLD_IMAGE" "$stage_dir/docker-compose.yml"; then
+            echo "Old image not found in compose: $OLD_IMAGE" >&2
+            exit 1
+          fi
+
+          perl -0pi -e 's|\Q$ENV{OLD_IMAGE}\E|$ENV{CURRENT_IMAGE}|g' "$stage_dir/docker-compose.yml"
+
+          if ! grep -Fq "$CURRENT_IMAGE" "$stage_dir/docker-compose.yml"; then
+            echo "Failed to rewrite image tag in compose" >&2
+            exit 1
+          fi
+
+          echo "stage_dir=$stage_dir" >> "$GITHUB_OUTPUT"
+
+      - name: Download docker image bundle
+        uses: actions/download-artifact@v7
+        with:
+          name: ${{ github.event.repository.name }}-${{ github.ref_name }}-docker-images
+          path: image-bundles
+
+      - name: Determine remote architecture
+        id: arch
         shell: bash
         run: |
           set -euo pipefail
 
-          ssh -l "$MONITOR_USER" "$MONITOR_IP" "mkdir -p '${REMOTE_DIR}'"
+          remote_arch="$(ssh -l "$HOST_USER" "$HOST_IP" uname -m)"
+          case "$remote_arch" in
+            x86_64|amd64)
+              package_label="x86_64-linux-gnu"
+              ;;
+            aarch64|arm64)
+              package_label="aarch64-linux-gnu"
+              ;;
+            *)
+              echo "Unsupported remote architecture: $remote_arch" >&2
+              exit 1
+              ;;
+          esac
 
-      - name: Sync install/docker to remote
+          echo "package_label=$package_label" >> "$GITHUB_OUTPUT"
+
+      - name: Ensure remote directories exist
         shell: bash
+        env:
+          DEPLOY_ENV: ${{ steps.deploy.outputs.deploy_env }}
+        run: |
+          set -euo pipefail
+
+          ssh -l "$HOST_USER" "$HOST_IP" "mkdir -p '${WORK_DIR}' '${WORK_DIR}/${DEPLOY_ENV}'"
+
+      - name: Upload image bundle to remote
+        shell: bash
+        env:
+          PACKAGE_LABEL: ${{ steps.arch.outputs.package_label }}
+        run: |
+          set -euo pipefail
+
+          bundle_file="wp-monitor-${{ github.ref_name }}-docker-images-${PACKAGE_LABEL}.tar.gz"
+          if [ ! -f "image-bundles/$bundle_file" ]; then
+            echo "Image bundle not found: image-bundles/$bundle_file" >&2
+            exit 1
+          fi
+
+          rsync -avz \
+            -e "ssh -l ${HOST_USER}" \
+            "image-bundles/$bundle_file" \
+            "${HOST_IP}:${WORK_DIR}/"
+
+      - name: Load remote images
+        shell: bash
+        env:
+          PACKAGE_LABEL: ${{ steps.arch.outputs.package_label }}
+        run: |
+          set -euo pipefail
+
+          bundle_file="wp-monitor-${{ github.ref_name }}-docker-images-${PACKAGE_LABEL}.tar.gz"
+          ssh -l "$HOST_USER" "$HOST_IP" "docker load -i '${WORK_DIR}/${bundle_file}' && rm -f '${WORK_DIR}/${bundle_file}'"
+
+      - name: Stop remote app service
+        shell: bash
+        env:
+          DEPLOY_ENV: ${{ steps.deploy.outputs.deploy_env }}
+        run: |
+          set -euo pipefail
+
+          ssh -l "$HOST_USER" "$HOST_IP" "cd '${WORK_DIR}/${DEPLOY_ENV}' && docker compose stop '${APP_NAME}' || true"
+
+      - name: Sync compose directory to remote
+        shell: bash
+        env:
+          DEPLOY_ENV: ${{ steps.deploy.outputs.deploy_env }}
         run: |
           set -euo pipefail
 
           rsync -avz --delete \
-            -e "ssh -l ${MONITOR_USER}" \
-            "install/docker/" \
-            "${MONITOR_IP}:${REMOTE_DIR}/"
+            -e "ssh -l ${HOST_USER}" \
+            "${{ steps.stage.outputs.stage_dir }}/" \
+            "${HOST_IP}:${WORK_DIR}/${DEPLOY_ENV}/"
 
-      - name: Deploy services
+      - name: Start app service
         shell: bash
         env:
-          COMPOSE_NAME: ${{ steps.compose.outputs.compose_name }}
+          DEPLOY_ENV: ${{ steps.deploy.outputs.deploy_env }}
         run: |
           set -euo pipefail
 
-          ssh -l "$MONITOR_USER" "$MONITOR_IP" \
-            "REMOTE_DIR='${REMOTE_DIR}' COMPOSE_NAME='${COMPOSE_NAME}' bash -s" <<'EOF'
-          set -euo pipefail
-
-          cd "$REMOTE_DIR"
-
-          if [ ! -f "$COMPOSE_NAME" ]; then
-            echo "Compose file not found: $REMOTE_DIR/$COMPOSE_NAME" >&2
-            exit 1
-          fi
-
-          echo "Using compose file: $COMPOSE_NAME"
-          docker compose -f "$COMPOSE_NAME" config --services
-
-          running_services="$(docker compose -f "$COMPOSE_NAME" ps --status running --services || true)"
-
-          metrics_running=false
-          logs_running=false
-
-          if printf '%s\n' "$running_services" | grep -qx 'victoria-metrics'; then
-            metrics_running=true
-          fi
-
-          if printf '%s\n' "$running_services" | grep -qx 'victoria-logs'; then
-            logs_running=true
-          fi
-
-          echo "victoria-metrics running: $metrics_running"
-          echo "victoria-logs running: $logs_running"
-
-          echo "Pull latest images declared in compose"
-          if [ "$metrics_running" = true ] && [ "$logs_running" = true ]; then
-            docker compose -f "$COMPOSE_NAME" pull wp-monitor
-          else
-            docker compose -f "$COMPOSE_NAME" pull
-          fi
-
-          echo "Stop and remove old wp-monitor"
-          docker compose -f "$COMPOSE_NAME" stop wp-monitor || true
-          docker compose -f "$COMPOSE_NAME" rm -f wp-monitor || true
-
-          if [ "$metrics_running" = true ] && [ "$logs_running" = true ]; then
-            echo "Only start wp-monitor"
-            docker compose -f "$COMPOSE_NAME" up -d wp-monitor
-          else
-            echo "Start full compose stack"
-            docker compose -f "$COMPOSE_NAME" up -d
-          fi
-          EOF
+          ssh -l "$HOST_USER" "$HOST_IP" \
+            "cd '${WORK_DIR}/${DEPLOY_ENV}' && docker compose -f docker-compose.yml config --services && docker compose -f docker-compose.yml up -d '${APP_NAME}'"

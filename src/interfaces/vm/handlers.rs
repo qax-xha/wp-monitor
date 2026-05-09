@@ -1,6 +1,6 @@
 use crate::application::layer_service::LayerService;
 use crate::domain::model::TimeRangeQuery;
-use crate::shared::api::{ApiResponse, ReadyResponse};
+use crate::shared::api::{ApiResponse, ReadyResponse, VersionResponse};
 use actix_web::{
     HttpResponse, Result,
     error::{ErrorBadRequest, ErrorInternalServerError},
@@ -247,6 +247,15 @@ pub async fn get_meta_config(svc: web::Data<LayerService>) -> Result<HttpRespons
     debug!("vm.handlers.meta_config.request");
     let data = svc.get_meta_config().await;
     Ok(HttpResponse::Ok().json(ApiResponse::ok(data)))
+}
+
+/// 获取当前项目版本号。
+#[get("/meta/version")]
+pub async fn get_meta_version() -> Result<HttpResponse> {
+    debug!("vm.handlers.meta_version.request");
+    Ok(HttpResponse::Ok().json(ApiResponse::ok(VersionResponse {
+        version: env!("CARGO_PKG_VERSION").to_string(),
+    })))
 }
 
 /// 就绪探针。
