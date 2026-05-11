@@ -17,7 +17,7 @@ parse_workers = 1
 path = "./data/rescue"
 
 [log_conf]
-level = "info,parse=info,data=info,mtrc=warn,kdb=warn,ctrl=info,launch=warn,sink=info"
+level = "info,parse=info,data=error,mtrc=warn,kdb=warn,ctrl=info,launch=warn,sink=info"
 # output = "Console"
 output = "File"
 [log_conf.file]
