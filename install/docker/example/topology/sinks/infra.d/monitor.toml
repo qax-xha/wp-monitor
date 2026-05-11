@@ -2,12 +2,11 @@ version = "2.0"
 
 [sink_group]
 name = "monitor"
-batch_size = 1
 batch_timeout_ms = 300
 
-# To export monitor metrics to VictoriaMetrics, uncomment and tune the sink below.
 [[sink_group.sinks]]
-name = "victoriametrics"
+name = "metrics_vmetrics_sink"
 connect = "victoriametrics_sink"
 [sink_group.sinks.params]
-insert_url = "http://127.0.0.1:18429/api/v1/import/prometheus"
+endpoint = "http://localhost    :18429"
+api_path = "/api/v1/import/prometheus"
