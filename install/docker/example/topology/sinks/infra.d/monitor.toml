@@ -8,5 +8,10 @@ batch_timeout_ms = 300
 name = "metrics_vmetrics_sink"
 connect = "victoriametrics_sink"
 [sink_group.sinks.params]
-endpoint = "http://localhost    :18429"
+endpoint = "http://localhost:18429"
 api_path = "/api/v1/import/prometheus"
+
+# [[sink_group.sinks]]
+# name = "metrics_vmetrics_sink"
+# connect = "victoriametrics_sink"
+# params = { insert_url = "http://victoria-metrics:18429/api/v1/import/prometheus",flush_interval_secs = 1}
