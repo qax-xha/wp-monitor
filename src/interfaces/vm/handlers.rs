@@ -1,11 +1,8 @@
 use crate::application::layer_service::LayerService;
 use crate::domain::model::TimeRangeQuery;
 use crate::shared::api::{ApiResponse, ReadyResponse, VersionResponse};
-use actix_web::{
-    HttpResponse, Result,
-    error::{ErrorBadRequest, ErrorInternalServerError},
-    get, web,
-};
+use crate::shared::error::AppErrorResponse;
+use actix_web::{HttpResponse, Result, get, web};
 use serde::Deserialize;
 use tracing::{debug, error};
 
@@ -54,11 +51,11 @@ pub async fn get_layers_snapshot(
             error = %e,
             "vm.handlers.layers_snapshot.invalid_params"
         );
-        ErrorBadRequest(e.to_string())
+        AppErrorResponse::from(e)
     })?;
     let data = svc.get_layers_snapshot(query).await.map_err(|e| {
         error!(error = %e, "vm.handlers.layers_snapshot.failed");
-        ErrorInternalServerError(e.to_string())
+        AppErrorResponse::from(e)
     })?;
     Ok(HttpResponse::Ok().json(ApiResponse::ok(data)))
 }
@@ -82,7 +79,7 @@ pub async fn get_layers_metrics(
             error = %e,
             "vm.handlers.layers_metrics.invalid_params"
         );
-        ErrorBadRequest(e.to_string())
+        AppErrorResponse::from(e)
     })?;
     let node_ids = req.node_ids.as_ref().map(|s| {
         s.split(',')
@@ -92,7 +89,7 @@ pub async fn get_layers_metrics(
 
     let data = svc.get_layers_metrics(query, node_ids).await.map_err(|e| {
         error!(error = %e, "vm.handlers.layers_metrics.failed");
-        ErrorInternalServerError(e.to_string())
+        AppErrorResponse::from(e)
     })?;
     Ok(HttpResponse::Ok().json(ApiResponse::ok(data)))
 }
@@ -119,11 +116,11 @@ pub async fn get_node_detail(
             error = %e,
             "vm.handlers.node_detail.invalid_params"
         );
-        ErrorBadRequest(e.to_string())
+        AppErrorResponse::from(e)
     })?;
     let data = svc.get_node_detail(node_id, query).await.map_err(|e| {
         error!(node_id = %node_id, error = %e, "vm.handlers.node_detail.failed");
-        ErrorInternalServerError(e.to_string())
+        AppErrorResponse::from(e)
     })?;
     Ok(HttpResponse::Ok().json(ApiResponse::ok(data)))
 }
@@ -151,7 +148,7 @@ pub async fn get_node_timeseries(
             error = %e,
             "vm.handlers.node_timeseries.invalid_params"
         );
-        ErrorBadRequest(e.to_string())
+        AppErrorResponse::from(e)
     })?;
     let data = svc
         .get_node_timeseries(node_id, query, req.max_data_points)
@@ -162,7 +159,7 @@ pub async fn get_node_timeseries(
                 error = %e,
                 "vm.handlers.node_timeseries.failed"
             );
-            ErrorInternalServerError(e.to_string())
+            AppErrorResponse::from(e)
         })?;
     Ok(HttpResponse::Ok().json(ApiResponse::ok(data)))
 }
@@ -207,7 +204,7 @@ pub async fn get_nodes_timeseries(
             error = %e,
             "vm.handlers.node_timeseries.invalid_params"
         );
-        ErrorBadRequest(e.to_string())
+        AppErrorResponse::from(e)
     })?;
     let scope = req.scope.as_ref().unwrap_or(&TimeSeriesScope::Parse);
     let data = match scope {
@@ -216,14 +213,14 @@ pub async fn get_nodes_timeseries(
             .await
             .map_err(|e| {
                 error!(error = %e, "vm.handlers.source_timeseries.failed");
-                ErrorInternalServerError(e.to_string())
+                AppErrorResponse::from(e)
             })?,
         TimeSeriesScope::Sink => svc
             .get_sink_timeseries(query, req.sink_group.clone(), req.max_data_points)
             .await
             .map_err(|e| {
                 error!(error = %e, "vm.handlers.sink_timeseries.failed");
-                ErrorInternalServerError(e.to_string())
+                AppErrorResponse::from(e)
             })?,
         TimeSeriesScope::Parse => svc
             .get_parse_timeseries(
@@ -235,7 +232,7 @@ pub async fn get_nodes_timeseries(
             .await
             .map_err(|e| {
                 error!(error = %e, "vm.handlers.parse_timeseries.failed");
-                ErrorInternalServerError(e.to_string())
+                AppErrorResponse::from(e)
             })?,
     };
     Ok(HttpResponse::Ok().json(ApiResponse::ok(data)))

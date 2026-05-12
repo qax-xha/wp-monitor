@@ -1,10 +1,11 @@
-use actix_web::{HttpResponse, Result, error::ErrorInternalServerError, get, http::header, web};
+use actix_web::{HttpResponse, Result, get, http::header, web};
 use chrono::{DateTime, Utc};
 use tracing::{debug, error, info};
 
 use crate::{
-    infrastructure::vlog_repository::{VlogHttpRepository, VlogRepository},
+    infrastructure::vlog_repository::{VlogHttpRepository, VlogRecord, VlogRepository},
     shared::api::ApiResponse,
+    shared::error::AppErrorResponse,
 };
 
 #[derive(Debug, serde::Deserialize)]
@@ -32,7 +33,7 @@ pub struct VlogMissedPageData {
     pub page: u32,
     pub page_size: u32,
     pub has_more: bool,
-    pub items: Vec<crate::infrastructure::vlog_repository::VlogRecord>,
+    pub items: Vec<VlogRecord>,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -106,7 +107,7 @@ pub async fn get_missed_data(
                 error = %e,
                 "vlog.handlers.missed_page.failed"
             );
-            ErrorInternalServerError(e.to_string())
+            AppErrorResponse::from(e)
         })?;
     let has_more = data.len() > page_size as usize;
     let items = data
@@ -155,7 +156,7 @@ pub async fn export_missed_data(
                 error = %e,
                 "vlog.handlers.missed_export.failed"
             );
-            ErrorInternalServerError(e.to_string())
+            AppErrorResponse::from(e)
         })?;
 
     let mut content = String::new();

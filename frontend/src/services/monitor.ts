@@ -1,4 +1,5 @@
 import type {
+  ApiErrorBody,
   ApiResp,
   LayerSnapshot,
   LayersMetricsResponse,
@@ -7,6 +8,7 @@ import type {
   NodeTimeSeries,
   VersionInfo,
 } from "@/types/monitor";
+import { ApiError } from "@/types/monitor";
 
 function normalizeIsoToSecondBoundary(iso: string) {
   const date = new Date(iso);
@@ -27,10 +29,15 @@ function normalizeMaxDataPoints(maxDataPoints?: number) {
   return Math.max(60, Math.min(2000, Math.floor(maxDataPoints)));
 }
 
-async function requestJson<T>(url: string, errorMessage: string) {
+/** 统一请求：成功返回 ApiResp<T>，失败抛出 ApiError（含 code/message/hints） */
+async function requestJson<T>(url: string) {
   const resp = await fetch(url);
-  if (!resp.ok) throw new Error(errorMessage);
-  return (await resp.json()) as ApiResp<T>;
+  const body = await resp.json();
+  if (!resp.ok) {
+    const err = body as ApiErrorBody;
+    throw new ApiError(err);
+  }
+  return body as ApiResp<T>;
 }
 
 function isoMinutesAgo(min: number) {
@@ -63,7 +70,7 @@ async function requestNodeTimeSeriesOnce(
   );
   const safeMaxDataPoints = normalizeMaxDataPoints(maxDataPoints);
   const url = `/api/v1/wp-monitor/nodes/${encodeURIComponent(nodeId)}/timeseries?start_time=${encodeURIComponent(normalizedStart)}&end_time=${encodeURIComponent(normalizedEnd)}${safeMaxDataPoints ? `&max_data_points=${safeMaxDataPoints}` : ""}`;
-  return requestJson<NodeTimeSeries>(url, "timeseries request failed");
+  return requestJson<NodeTimeSeries>(url);
 }
 
 export async function fetchParseTimeSeries(
@@ -94,21 +101,20 @@ export async function fetchParseTimeSeries(
     params.set("sink_group", sinkGroup);
   }
   const url = `/api/v1/wp-monitor/nodes/timeseries?${params.toString()}`;
-  return requestJson<NodeTimeSeries[]>(url, "parse timeseries request failed");
+  return requestJson<NodeTimeSeries[]>(url);
 }
 
 export async function fetchSnapshot(startTime?: string, endTime?: string) {
   const start = normalizeIsoToSecondBoundary(startTime ?? isoMinutesAgo(15));
   const end = normalizeIsoToSecondBoundary(endTime ?? new Date().toISOString());
   const url = `/api/v1/wp-monitor/layers/snapshot?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}`;
-  const data = await requestJson<LayerSnapshot>(url, "snapshot request failed");
+  const data = await requestJson<LayerSnapshot>(url);
   return data.data;
 }
 
 export async function fetchVersion() {
   const data = await requestJson<VersionInfo>(
     "/api/v1/wp-monitor/meta/version",
-    "version request failed",
   );
   return data.data;
 }
@@ -130,10 +136,7 @@ export async function fetchMetrics(
     params.set("node_ids", nodeIds.join(","));
   }
   const url = `/api/v1/wp-monitor/layers/metrics?${params.toString()}`;
-  const data = await requestJson<LayersMetricsResponse>(
-    url,
-    "metrics request failed",
-  );
+  const data = await requestJson<LayersMetricsResponse>(url);
   return data.data;
 }
 
@@ -147,7 +150,7 @@ export async function fetchNodeDetail(
     endTime,
   );
   const url = `/api/v1/wp-monitor/nodes/${encodeURIComponent(nodeId)}/detail?start_time=${encodeURIComponent(normalizedStart)}&end_time=${encodeURIComponent(normalizedEnd)}`;
-  return requestJson<NodeDetail>(url, "detail request failed");
+  return requestJson<NodeDetail>(url);
 }
 
 export async function fetchNodeTimeSeries(
@@ -175,7 +178,6 @@ export async function fetchNodeTimeSeries(
     if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || durationMs <= 0) {
       throw err;
     }
-    // 仅在大窗口失败时回退为分段请求，尽量保持原有性能与行为。
     const fallbackThresholdMs = 24 * 60 * 60 * 1000;
     if (durationMs <= fallbackThresholdMs) {
       throw err;
@@ -231,10 +233,7 @@ export async function fetchMissedLogs(
   const safePage = Math.max(1, Math.floor(page || 1));
   const safePageSize = Math.max(1, Math.min(100, Math.floor(pageSize || 10)));
   const url = `/api/v1/wp-monitor/vlog/missed?query=${encodeURIComponent("wp_stage:miss")}&start=${encodeURIComponent(normalizedStart)}&end=${encodeURIComponent(normalizedEnd)}&page=${safePage}&page_size=${safePageSize}`;
-  const data = await requestJson<MissedLogsPage>(
-    url,
-    "missed logs request failed",
-  );
+  const data = await requestJson<MissedLogsPage>(url);
   return data.data;
 }
 
@@ -245,6 +244,9 @@ export async function exportMissedLogs(startTime: string, endTime: string) {
   );
   const url = `/api/v1/wp-monitor/vlog/missed/export?query=${encodeURIComponent("wp_stage:miss")}&start=${encodeURIComponent(normalizedStart)}&end=${encodeURIComponent(normalizedEnd)}`;
   const resp = await fetch(url);
-  if (!resp.ok) throw new Error("missed logs export failed");
+  if (!resp.ok) {
+    const body = await resp.json() as ApiErrorBody;
+    throw new ApiError(body);
+  }
   return resp;
 }

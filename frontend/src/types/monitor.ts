@@ -113,10 +113,37 @@ export interface NodeTimeSeries {
   log_count: TimePoint[];
 }
 
+/** 成功响应（code=0 的场景） */
 export interface ApiResp<T> {
   code: number;
   message: string;
   data: T;
+}
+
+/** 错误响应体（orion-error to_http_error_json() 的格式） */
+export interface ApiErrorBody {
+  status: number;
+  code: string;
+  category: string;
+  message: string;
+  visibility: string;
+  hints: string[];
+}
+
+export class ApiError extends Error {
+  status: number;
+  code: string;
+  category: string;
+  hints: string[];
+
+  constructor(body: ApiErrorBody) {
+    super(body.message);
+    this.name = 'ApiError';
+    this.status = body.status;
+    this.code = body.code;
+    this.category = body.category;
+    this.hints = body.hints;
+  }
 }
 
 export interface VersionInfo {

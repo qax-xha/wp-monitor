@@ -2,8 +2,9 @@ use crate::domain::model::{
     LayerSnapshot, LayerVersions, LayersMetricsResponse, MetricsSnapshot, MissNode, NodeDetail,
     NodeMetricsItem, NodeTimeSeries, SnapshotMeta, TimeRangeQuery,
 };
-use crate::infrastructure::vm_repository::{VmRepoError, VmRepository, VmSnapshotData};
+use crate::infrastructure::vm_repository::{VmRepository, VmSnapshotData};
 use crate::shared::config::AppConfig;
+use crate::shared::error::AppError;
 use crate::shared::hash::stable_hash_json;
 use chrono::Utc;
 use std::collections::HashMap;
@@ -293,7 +294,7 @@ impl LayerService {
     pub async fn get_layers_snapshot(
         &self,
         query: TimeRangeQuery,
-    ) -> Result<LayerSnapshot, VmRepoError> {
+    ) -> Result<LayerSnapshot, AppError> {
         debug!(
             start_time = %query.start_time,
             end_time = %query.end_time,
@@ -348,7 +349,7 @@ impl LayerService {
         &self,
         query: TimeRangeQuery,
         node_ids: Option<Vec<String>>,
-    ) -> Result<LayersMetricsResponse, VmRepoError> {
+    ) -> Result<LayersMetricsResponse, AppError> {
         let snapshot = self.get_layers_snapshot(query).await?;
 
         let mut items = Vec::new();
@@ -416,7 +417,7 @@ impl LayerService {
         &self,
         node_id: &str,
         query: TimeRangeQuery,
-    ) -> Result<NodeDetail, VmRepoError> {
+    ) -> Result<NodeDetail, AppError> {
         debug!(node_id = %node_id, "layer_service.node_detail.start");
         let snapshot = self.get_layers_snapshot(query.clone()).await?;
         if let Some(detail) =
@@ -515,7 +516,7 @@ impl LayerService {
         node_id: &str,
         query: TimeRangeQuery,
         max_data_points: Option<usize>,
-    ) -> Result<NodeTimeSeries, VmRepoError> {
+    ) -> Result<NodeTimeSeries, AppError> {
         if node_id == "miss" {
             debug!(node_id = %node_id, "layer_service.node_timeseries.miss_empty");
             return Ok(NodeTimeSeries {
@@ -542,7 +543,7 @@ impl LayerService {
         package_name: Option<String>,
         log_type: Option<String>,
         max_data_points: Option<usize>,
-    ) -> Result<Vec<NodeTimeSeries>, VmRepoError> {
+    ) -> Result<Vec<NodeTimeSeries>, AppError> {
         let package_name = package_name.as_deref().unwrap_or(".*");
         let log_type = log_type.as_deref().unwrap_or(".*");
         let timeseries = self
@@ -557,7 +558,7 @@ impl LayerService {
         &self,
         query: TimeRangeQuery,
         max_data_points: Option<usize>,
-    ) -> Result<Vec<NodeTimeSeries>, VmRepoError> {
+    ) -> Result<Vec<NodeTimeSeries>, AppError> {
         self.vm_repo
             .fetch_source_timeseries(&query, max_data_points)
             .await
@@ -569,7 +570,7 @@ impl LayerService {
         query: TimeRangeQuery,
         sink_group: Option<String>,
         max_data_points: Option<usize>,
-    ) -> Result<Vec<NodeTimeSeries>, VmRepoError> {
+    ) -> Result<Vec<NodeTimeSeries>, AppError> {
         self.vm_repo
             .fetch_sink_timeseries(&query, sink_group.as_deref(), max_data_points)
             .await

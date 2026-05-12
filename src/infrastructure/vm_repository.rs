@@ -2,23 +2,14 @@ use crate::domain::model::{
     LogTypeNode, MetricsSnapshot, NodeTimeSeries, ParseNode, SinkGroupNode, SinkLeafNode,
     SourceNode, SysMetrics, TimePoint, TimeRangeQuery,
 };
+use crate::shared::error::{AppError, AppReason};
 use async_trait::async_trait;
 use chrono::Utc;
+use orion_error::{OperationContext, prelude::*};
 use reqwest::Client;
 use serde::Deserialize;
 use std::collections::HashMap;
 use tracing::{debug, warn};
-
-/// VM 仓储错误：
-/// - Request：网络请求/连接错误；
-/// - InvalidResponse：响应 JSON 结构不符合预期。
-#[derive(Debug, thiserror::Error)]
-pub enum VmRepoError {
-    #[error("vm request failed: {0}")]
-    Request(String),
-    #[error("vm response invalid: {0}")]
-    InvalidResponse(String),
-}
 
 /// 从 VM 查询后，应用层所需的基础快照原始数据。
 #[derive(Debug, Clone)]
@@ -34,38 +25,34 @@ pub struct VmSnapshotData {
 /// - fetch_node_timeseries：按节点拉区间序列。
 #[async_trait]
 pub trait VmRepository: Send + Sync {
-    async fn fetch_snapshot_data(
-        &self,
-        query: &TimeRangeQuery,
-    ) -> Result<VmSnapshotData, VmRepoError>;
-    async fn fetch_miss_metrics(
-        &self,
-        query: &TimeRangeQuery,
-    ) -> Result<MetricsSnapshot, VmRepoError>;
+    async fn fetch_snapshot_data(&self, query: &TimeRangeQuery)
+    -> Result<VmSnapshotData, AppError>;
+    async fn fetch_miss_metrics(&self, query: &TimeRangeQuery)
+    -> Result<MetricsSnapshot, AppError>;
     async fn fetch_node_timeseries(
         &self,
         node_id: &str,
         query: &TimeRangeQuery,
         max_data_points: Option<usize>,
-    ) -> Result<NodeTimeSeries, VmRepoError>;
+    ) -> Result<NodeTimeSeries, AppError>;
     async fn fetch_parse_timeseries(
         &self,
         query: &TimeRangeQuery,
         package_name: &str,
         rule_name: &str,
         max_data_points: Option<usize>,
-    ) -> Result<Vec<NodeTimeSeries>, VmRepoError>;
+    ) -> Result<Vec<NodeTimeSeries>, AppError>;
     async fn fetch_source_timeseries(
         &self,
         query: &TimeRangeQuery,
         max_data_points: Option<usize>,
-    ) -> Result<Vec<NodeTimeSeries>, VmRepoError>;
+    ) -> Result<Vec<NodeTimeSeries>, AppError>;
     async fn fetch_sink_timeseries(
         &self,
         query: &TimeRangeQuery,
         sink_group: Option<&str>,
         max_data_points: Option<usize>,
-    ) -> Result<Vec<NodeTimeSeries>, VmRepoError>;
+    ) -> Result<Vec<NodeTimeSeries>, AppError>;
 }
 
 /// 基于 HTTP 协议访问 VictoriaMetrics 的仓储实现。
@@ -197,26 +184,32 @@ impl VmHttpRepository {
         &self,
         promql: &str,
         at_unix: i64,
-    ) -> Result<Vec<VmSeriesValue>, VmRepoError> {
+    ) -> Result<Vec<VmSeriesValue>, AppError> {
         let url = format!("{}/api/v1/query", self.base_url);
-        debug!(
-            endpoint = "/api/v1/query",
-            at_unix = at_unix,
-            promql = promql,
-            "vm_repository.instant_query.start"
-        );
+        let ctx = OperationContext::doing("instant_query")
+            .with_field("url", url.clone())
+            .with_field("promql", promql.to_string());
+
         let resp = self
             .client
             .get(url)
             .query(&[("query", promql), ("time", &at_unix.to_string())])
             .send()
             .await
-            .map_err(|e| VmRepoError::Request(e.to_string()))?;
+            .source_raw_err(
+                AppReason::VmRequestFailed,
+                "http request to victoria metrics failed",
+            )
+            .with_context(&ctx)?;
 
         let data = resp
             .json::<VmQueryResp>()
             .await
-            .map_err(|e| VmRepoError::InvalidResponse(e.to_string()))?;
+            .source_raw_err(
+                AppReason::VmResponseInvalid,
+                "parse vm instant query response failed",
+            )
+            .with_context(&ctx)?;
         debug!(
             endpoint = "/api/v1/query",
             result_size = data.data.result.len(),
@@ -242,8 +235,11 @@ impl VmHttpRepository {
         start_unix: i64,
         end_unix: i64,
         step: &str,
-    ) -> Result<Vec<VmRangeSeries>, VmRepoError> {
+    ) -> Result<Vec<VmRangeSeries>, AppError> {
         let url = format!("{}/api/v1/query_range", self.base_url);
+        let ctx = OperationContext::doing("range_query")
+            .with_field("url", url.clone())
+            .with_field("promql", promql.to_string());
         debug!(
             endpoint = "/api/v1/query_range",
             start_unix = start_unix,
@@ -263,12 +259,20 @@ impl VmHttpRepository {
             ])
             .send()
             .await
-            .map_err(|e| VmRepoError::Request(e.to_string()))?;
+            .source_raw_err(
+                AppReason::VmRequestFailed,
+                "vm range query http request failed",
+            )
+            .with_context(&ctx)?;
 
         let data = resp
             .json::<VmRangeResp>()
             .await
-            .map_err(|e| VmRepoError::InvalidResponse(e.to_string()))?;
+            .source_raw_err(
+                AppReason::VmResponseInvalid,
+                "parse vm range query response failed",
+            )
+            .with_context(&ctx)?;
         debug!(
             endpoint = "/api/v1/query_range",
             series_size = data.data.result.len(),
@@ -533,7 +537,7 @@ impl VmHttpRepository {
         max_data_points: Option<usize>,
         query_prom: String,
         node_id_builder: F,
-    ) -> Result<Vec<NodeTimeSeries>, VmRepoError>
+    ) -> Result<Vec<NodeTimeSeries>, AppError>
     where
         F: Fn(&HashMap<String, String>) -> String,
     {
@@ -556,10 +560,7 @@ impl VmHttpRepository {
             "vm_repository.scope_timeseries.start"
         );
 
-        let series = self
-            .range_query(&query_prom, start, end, &step)
-            .await
-            .map_err(|e| VmRepoError::Request(e.to_string()))?;
+        let series = self.range_query(&query_prom, start, end, &step).await?;
         let mut out = Vec::with_capacity(series.len());
         for s in series {
             let node_id = node_id_builder(&s.metric);
@@ -585,7 +586,7 @@ impl VmRepository for VmHttpRepository {
     async fn fetch_snapshot_data(
         &self,
         query: &TimeRangeQuery,
-    ) -> Result<VmSnapshotData, VmRepoError> {
+    ) -> Result<VmSnapshotData, AppError> {
         let at_start = query.start_time.timestamp();
         let at_end = query.end_time.timestamp();
         let window_secs = (at_end - at_start).max(1) as f64;
@@ -625,8 +626,7 @@ impl VmRepository for VmHttpRepository {
             self.instant_query(&parse_count_q, at_end),
             self.instant_query(&sink_group_count_q, at_end),
             self.instant_query(&sink_count_q, at_end),
-        )
-        .map_err(|e| VmRepoError::Request(e.to_string()))?;
+        )?;
 
         let source_rate = Self::rate_from_count_rows(&source_count, window_secs);
         let parse_rate = Self::rate_from_count_rows(&parse_count, window_secs);
@@ -639,8 +639,7 @@ impl VmRepository for VmHttpRepository {
         let (cpu_rows, mem_rows) = tokio::try_join!(
             self.instant_query(&cpu_query, at_end),
             self.instant_query(&mem_query, at_end),
-        )
-        .map_err(|e| VmRepoError::Request(e.to_string()))?;
+        )?;
 
         let cpu = cpu_rows.first().map(|x| x.value).unwrap_or(0.0000);
         let mem = mem_rows.first().map(|x| x.value).unwrap_or(0.0000);
@@ -672,7 +671,7 @@ impl VmRepository for VmHttpRepository {
     async fn fetch_miss_metrics(
         &self,
         query: &TimeRangeQuery,
-    ) -> Result<MetricsSnapshot, VmRepoError> {
+    ) -> Result<MetricsSnapshot, AppError> {
         let at_start = query.start_time.timestamp();
         let at_end = query.end_time.timestamp();
         let window_secs = (at_end - at_start).max(1) as f64;
@@ -689,10 +688,7 @@ impl VmRepository for VmHttpRepository {
                 &format!("{}s", (at_end - at_start).max(1)),
             )
         );
-        let end_rows = self
-            .instant_query(&total_q, at_end)
-            .await
-            .map_err(|e| VmRepoError::Request(e.to_string()))?;
+        let end_rows = self.instant_query(&total_q, at_end).await?;
         let count_f = end_rows.first().map(|x| x.value).unwrap_or(0.0).max(0.0);
         let count = count_f.round() as u64;
         let rate = count_f / window_secs;
@@ -717,7 +713,7 @@ impl VmRepository for VmHttpRepository {
         node_id: &str,
         query: &TimeRangeQuery,
         max_data_points: Option<usize>,
-    ) -> Result<NodeTimeSeries, VmRepoError> {
+    ) -> Result<NodeTimeSeries, AppError> {
         let (step, rate_window, step_secs) = Self::auto_step_for_timeseries(query, max_data_points);
         let rate_window_secs = rate_window
             .trim_end_matches('s')
@@ -830,10 +826,7 @@ impl VmRepository for VmHttpRepository {
         } else {
             avg_rate_base_q.clone()
         };
-        let rate_series = self
-            .range_query(&rate_q, start, end, &step)
-            .await
-            .map_err(|e| VmRepoError::Request(e.to_string()))?;
+        let rate_series = self.range_query(&rate_q, start, end, &step).await?;
 
         let mut rate_points = Self::series_to_points(&rate_series);
         if rate_points.is_empty() {
@@ -864,7 +857,7 @@ impl VmRepository for VmHttpRepository {
         package_name: &str,
         rule_name: &str,
         max_data_points: Option<usize>,
-    ) -> Result<Vec<NodeTimeSeries>, VmRepoError> {
+    ) -> Result<Vec<NodeTimeSeries>, AppError> {
         let (_, rate_window, _) = Self::auto_step_for_timeseries(query, max_data_points);
         let rate_window_secs = rate_window
             .trim_end_matches('s')
@@ -909,7 +902,7 @@ impl VmRepository for VmHttpRepository {
         &self,
         query: &TimeRangeQuery,
         max_data_points: Option<usize>,
-    ) -> Result<Vec<NodeTimeSeries>, VmRepoError> {
+    ) -> Result<Vec<NodeTimeSeries>, AppError> {
         let (_, rate_window, _) = Self::auto_step_for_timeseries(query, max_data_points);
         let rate_window_secs = rate_window
             .trim_end_matches('s')
@@ -939,7 +932,7 @@ impl VmRepository for VmHttpRepository {
         query: &TimeRangeQuery,
         sink_group: Option<&str>,
         max_data_points: Option<usize>,
-    ) -> Result<Vec<NodeTimeSeries>, VmRepoError> {
+    ) -> Result<Vec<NodeTimeSeries>, AppError> {
         let (_, rate_window, _) = Self::auto_step_for_timeseries(query, max_data_points);
         let rate_window_secs = rate_window
             .trim_end_matches('s')
