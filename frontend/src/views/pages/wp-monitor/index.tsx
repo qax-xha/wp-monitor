@@ -138,6 +138,30 @@ function normalizeNodePillText(name: string) {
   return name;
 }
 
+function resolveTimeRange(currentStart: string, currentEnd: string) {
+  const startMs = new Date(currentStart).getTime();
+  const endMs = new Date(currentEnd).getTime();
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || startMs >= endMs) {
+    const end = nowWithLagIso();
+    const fallbackStart = new Date(new Date(end).getTime() - 5 * 60 * 1000).toISOString();
+    let start = Number.isFinite(startMs) ? currentStart : fallbackStart;
+    if (new Date(start).getTime() >= new Date(end).getTime()) start = fallbackStart;
+    return { start, end };
+  }
+  return { start: currentStart, end: currentEnd };
+}
+
+function filterLogsByMode(
+  logs: Array<{ name: string; metrics: { log_rate_eps: number } }>,
+  mode: "withData" | "noData",
+) {
+  return logs.filter((log) =>
+    mode === "withData"
+      ? log.metrics.log_rate_eps > 0
+      : log.metrics.log_rate_eps === 0,
+  );
+}
+
 function buildQuickRange(key: string) {
   const now = new Date(nowWithLagMs());
   if (key === "today") {
@@ -285,20 +309,17 @@ export default function WpMonitorPage() {
     }
   }
 
-  function zeroSeriesForSilent(seriesList: NodeTimeSeries[]): NodeTimeSeries[] {
-    if (parseFilterRef.current !== "noData") return seriesList;
-    return seriesList.map((s) => ({
-      ...s,
-      log_rate_eps: s.log_rate_eps.map((p) => ({ ...p, value: 0 })),
-      log_count: s.log_count.map((p) => ({ ...p, value: 0 })),
-    }));
-  }
-
   async function refreshMetricsOnly() {
     if (!snapshot) return;
     triggerRefreshSpin();
     try {
       const ids = collectAllNodeIds(snapshot);
+      const pkgFilters = filteredParses
+        .map((pkg) => ({
+          packageName: pkg.package_name,
+          ruleNames: filterLogsByMode(pkg.logs, parseFilterRef.current).map((log) => log.name),
+        }))
+        .filter((f) => f.ruleNames.length > 0);
       // 自动刷新时保持窗口长度恒定，避免仅更新 end_time 导致时间范围持续漂移。
       const nowMs = nowWithLagMs();
       const startMs = new Date(startTime).getTime();
@@ -309,7 +330,7 @@ export default function WpMonitorPage() {
           : 5 * 60 * 1000;
       const nextEnd = new Date(nowMs).toISOString();
       const nextStart = new Date(nowMs - durationMs).toISOString();
-      const data = await fetchMetrics(nextStart, nextEnd, ids);
+      const data = await fetchMetrics(nextStart, nextEnd, ids, pkgFilters);
       setSnapshot((prev) =>
         prev ? applyMetricsToSnapshot(prev, data.items) : prev,
       );
@@ -459,8 +480,8 @@ export default function WpMonitorPage() {
   const filteredParses = useMemo(() => {
     if (!snapshot) return [];
     return snapshot.parses.filter((p) => {
-      if (parseFilter === "withData") return p.metrics.log_count > 0;
-      if (parseFilter === "noData") return p.logs.some((l) => l.metrics.log_count === 0);
+      if (parseFilter === "withData") return p.metrics.log_rate_eps > 0;
+      if (parseFilter === "noData") return p.logs.some((l) => l.metrics.log_rate_eps === 0);
       return true;
     });
   }, [snapshot, parseFilter]);
@@ -470,11 +491,7 @@ export default function WpMonitorPage() {
     let cur: typeof filteredParses = [];
     let curCnt = 0;
     for (const pkg of filteredParses) {
-      const cnt = parseFilter === "withData"
-        ? pkg.logs.filter((l) => l.metrics.log_count > 0).length
-        : parseFilter === "noData"
-          ? pkg.logs.filter((l) => l.metrics.log_count === 0).length
-          : pkg.logs.length;
+      const cnt = filterLogsByMode(pkg.logs, parseFilter).length;
       if (curCnt >= PARSE_PAGE_SIZE && cur.length > 0) {
         pages.push(cur);
         cur = [];
@@ -605,28 +622,28 @@ export default function WpMonitorPage() {
 
     const refreshScopeTimeseries = async () => {
       try {
+        const filter = parseFilterRef.current;
         const nextEndMs = nowWithLagMs();
         const nextStart = new Date(nextEndMs - durationMs).toISOString();
         const nextEnd = new Date(nextEndMs).toISOString();
         let timeseriesResp;
         if (scopeModeRef.current === "package") {
+          const pkgFilters = filteredParses.map((pkg) => ({
+            packageName: pkg.package_name,
+            ruleNames: filterLogsByMode(pkg.logs, filter).map((log) => log.name),
+          }));
           timeseriesResp = await fetchPackagesTimeSeries(
             nextStart, nextEnd, estimateMaxDataPoints(),
-            filteredParses.map((p) => p.package_name),
+            pkgFilters,
           );
         } else {
           let logNodeIds: string[] | undefined;
           const req = scopeSeriesRequest;
           if (req.scope === "parse" && req.packageName) {
             const snap = snapshotRef.current;
-            const filter = parseFilterRef.current;
             const pkg = snap?.parses.find((p) => p.package_name === req.packageName);
             if (pkg) {
-              const logs = filter === "withData"
-                ? pkg.logs.filter((l) => l.metrics.log_count > 0)
-                : filter === "noData"
-                  ? pkg.logs.filter((l) => l.metrics.log_count === 0)
-                  : pkg.logs;
+              const logs = filterLogsByMode(pkg.logs, filter);
               logNodeIds = logs.map((l) => l.name);
             }
           }
@@ -639,7 +656,7 @@ export default function WpMonitorPage() {
           );
         }
         if (cancelled) return;
-        setParseSeriesList(zeroSeriesForSilent(timeseriesResp.data ?? []));
+        setParseSeriesList(timeseriesResp.data ?? []);
         setDetailStartTime(nextStart);
         setDetailEndTime(nextEnd);
         setDrawerError("");
@@ -728,11 +745,7 @@ export default function WpMonitorPage() {
       if (req.scope === "parse" && req.packageName) {
         const pkg = snapshot.parses.find((p) => p.package_name === req.packageName);
         if (pkg) {
-          const logs = parseFilter === "withData"
-            ? pkg.logs.filter((l) => l.metrics.log_count > 0)
-            : parseFilter === "noData"
-              ? pkg.logs.filter((l) => l.metrics.log_count === 0)
-              : pkg.logs;
+          const logs = filterLogsByMode(pkg.logs, parseFilter);
           logNodeIds = logs.map((l) => l.name);
         }
       }
@@ -740,7 +753,7 @@ export default function WpMonitorPage() {
         req.scope, detailStartTime, detailEndTime, estimateMaxDataPoints(),
         req.packageName, req.sinkGroup, logNodeIds,
       ).then((resp) => {
-        setParseSeriesList(zeroSeriesForSilent(resp.data ?? []));
+        setParseSeriesList(resp.data ?? []);
       }).catch((err) => {
         setDrawerError((err as Error).message || "Parse 时间序列获取失败");
       });
@@ -865,25 +878,7 @@ export default function WpMonitorPage() {
     setScopeSeriesRequest(null);
     const missNodeId = snapshot?.miss.id ?? "";
     const isMissNode = nodeId === missNodeId;
-    let currentStart = startTime;
-    let currentEnd = endTime || nowWithLagIso();
-    const startMs = new Date(currentStart).getTime();
-    const endMs = new Date(currentEnd).getTime();
-    if (
-      !Number.isFinite(startMs) ||
-      !Number.isFinite(endMs) ||
-      startMs >= endMs
-    ) {
-      currentEnd = nowWithLagIso();
-      const fallbackStart = new Date(
-        new Date(currentEnd).getTime() - 5 * 60 * 1000,
-      ).toISOString();
-      currentStart = Number.isFinite(startMs) ? currentStart : fallbackStart;
-      if (new Date(currentStart).getTime() >= new Date(currentEnd).getTime()) {
-        currentStart = fallbackStart;
-      }
-    }
-    const detailRange = { start: currentStart, end: currentEnd };
+    const detailRange = resolveTimeRange(startTime, endTime || nowWithLagIso());
     setSelectedNode(nodeId);
     setDetailStartTime(detailRange.start);
     setDetailEndTime(detailRange.end);
@@ -913,12 +908,12 @@ export default function WpMonitorPage() {
       );
       if (isMissNode) {
         setMissLogsLoading(true);
-        setMissWindowStart(currentStart);
-        setMissWindowEnd(currentEnd);
+        setMissWindowStart(detailRange.start);
+        setMissWindowEnd(detailRange.end);
         const [detailResp, seriesResp, missedResp] = await Promise.all([
           detailPromise,
           seriesPromise,
-          fetchMissedLogs(currentStart, currentEnd, 1, MISS_PAGE_SIZE),
+          fetchMissedLogs(detailRange.start, detailRange.end, 1, MISS_PAGE_SIZE),
         ]);
         setMissLogs(missedResp.items);
         setMissHasMore(missedResp.has_more);
@@ -961,27 +956,10 @@ export default function WpMonitorPage() {
     setDetailNodePill(normalizeNodePillText(title.replace(/ 节点趋势$/, "")));
     setHiddenScopeSeriesNames([]);
     setScopeSeriesRequest({ scope, packageName, sinkGroup });
-    let currentStart = startTime;
-    let currentEnd = endTime || nowWithLagIso();
-    const startMs = new Date(currentStart).getTime();
-    const endMs = new Date(currentEnd).getTime();
-    if (
-      !Number.isFinite(startMs) ||
-      !Number.isFinite(endMs) ||
-      startMs >= endMs
-    ) {
-      currentEnd = nowWithLagIso();
-      const fallbackStart = new Date(
-        new Date(currentEnd).getTime() - 5 * 60 * 1000,
-      ).toISOString();
-      currentStart = Number.isFinite(startMs) ? currentStart : fallbackStart;
-      if (new Date(currentStart).getTime() >= new Date(currentEnd).getTime()) {
-        currentStart = fallbackStart;
-      }
-    }
+    const range = resolveTimeRange(startTime, endTime || nowWithLagIso());
     setSelectedNode(selectedId);
-    setDetailStartTime(currentStart);
-    setDetailEndTime(currentEnd);
+    setDetailStartTime(range.start);
+    setDetailEndTime(range.end);
     setDrawerLoading(true);
     setDrawerError("");
     setDetail(null);
@@ -994,24 +972,20 @@ export default function WpMonitorPage() {
       if (scope === "parse" && packageName) {
         const pkg = snapshot?.parses.find((p) => p.package_name === packageName);
         if (pkg) {
-          const logs = parseFilter === "withData"
-            ? pkg.logs.filter((l) => l.metrics.log_count > 0)
-            : parseFilter === "noData"
-              ? pkg.logs.filter((l) => l.metrics.log_count === 0)
-              : pkg.logs;
+          const logs = filterLogsByMode(pkg.logs, parseFilter);
           logNodeIds = logs.map((l) => l.name);
         }
       }
       const timeseriesResp = await fetchParseTimeSeries(
         scope,
-        currentStart,
-        currentEnd,
+        range.start,
+        range.end,
         estimateMaxDataPoints(),
         packageName,
         sinkGroup,
         logNodeIds,
       );
-      setParseSeriesList(zeroSeriesForSilent(timeseriesResp.data ?? []));
+      setParseSeriesList(timeseriesResp.data ?? []);
     } catch (err) {
       setDrawerError((err as Error).message || "Parse 时间序列获取失败");
     } finally {
@@ -1026,19 +1000,10 @@ export default function WpMonitorPage() {
     setDetailNodePill(normalizeNodePillText("Parse 层"));
     setHiddenScopeSeriesNames([]);
     setScopeSeriesRequest({ scope: "parse" });
-    let currentStart = startTime;
-    let currentEnd = endTime || nowWithLagIso();
-    const startMs = new Date(currentStart).getTime();
-    const endMs = new Date(currentEnd).getTime();
-    if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || startMs >= endMs) {
-      currentEnd = nowWithLagIso();
-      const fallbackStart = new Date(new Date(currentEnd).getTime() - 5 * 60 * 1000).toISOString();
-      currentStart = Number.isFinite(startMs) ? currentStart : fallbackStart;
-      if (new Date(currentStart).getTime() >= new Date(currentEnd).getTime()) currentStart = fallbackStart;
-    }
+    const range = resolveTimeRange(startTime, endTime || nowWithLagIso());
     setSelectedNode("__parse__");
-    setDetailStartTime(currentStart);
-    setDetailEndTime(currentEnd);
+    setDetailStartTime(range.start);
+    setDetailEndTime(range.end);
     setDrawerLoading(true);
     setDrawerError("");
     setDetail(null);
@@ -1049,11 +1014,15 @@ export default function WpMonitorPage() {
       if (filteredParses.length === 0) {
         setParseSeriesList([]);
       } else {
+        const pkgFilters = filteredParses.map((pkg) => ({
+          packageName: pkg.package_name,
+          ruleNames: filterLogsByMode(pkg.logs, parseFilter).map((log) => log.name),
+        }));
         const timeseriesResp = await fetchPackagesTimeSeries(
-          currentStart, currentEnd, estimateMaxDataPoints(),
-          filteredParses.map((p) => p.package_name),
+          range.start, range.end, estimateMaxDataPoints(),
+          pkgFilters,
         );
-        setParseSeriesList(zeroSeriesForSilent(timeseriesResp.data ?? []));
+        setParseSeriesList(timeseriesResp.data ?? []);
       }
     } catch (err) {
       setDrawerError((err as Error).message || "Parse 时间序列获取失败");
@@ -1491,9 +1460,9 @@ export default function WpMonitorPage() {
                 {parsePageItems.map((parseItem) => {
                   const isExpanded = expandedPackages.includes(parseItem.id);
                   const showLogs = parseFilter === "withData"
-                    ? parseItem.logs.filter((l) => l.metrics.log_count > 0)
+                    ? parseItem.logs.filter((l) => l.metrics.log_rate_eps > 0)
                     : parseFilter === "noData"
-                      ? parseItem.logs.filter((l) => l.metrics.log_count === 0)
+                      ? parseItem.logs.filter((l) => l.metrics.log_rate_eps === 0)
                       : parseItem.logs;
                   return (
                     <section
@@ -1525,8 +1494,8 @@ export default function WpMonitorPage() {
                             {parseItem.package_name}
                           </div>
                           <div className="node__summary">
-                            {fmtRate(parseFilter === "noData" ? 0 : parseItem.metrics.log_rate_eps)} /{" "}
-                            {fmtCount(parseFilter === "noData" ? 0 : parseItem.metrics.log_count)} (汇总) ·{" "}
+                            {fmtRate(parseItem.metrics.log_rate_eps)} /{" "}
+                            {fmtCount(parseItem.metrics.log_count)} (汇总) ·{" "}
                             {showLogs.length} 个日志类型
                           </div>
                         </div>

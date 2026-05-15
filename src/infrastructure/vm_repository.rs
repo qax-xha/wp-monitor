@@ -1,7 +1,9 @@
+use crate::application::layer_service::escape_regex_chars;
 use crate::domain::model::{
     LogTypeNode, MetricsSnapshot, NodeTimeSeries, ParseNode, SinkGroupNode, SinkLeafNode,
     SourceNode, SysMetrics, TimePoint, TimeRangeQuery,
 };
+use crate::interfaces::vm::handlers::PackageFilter;
 use crate::shared::error::{AppError, AppReason};
 use async_trait::async_trait;
 use chrono::Utc;
@@ -25,8 +27,11 @@ pub struct VmSnapshotData {
 /// - fetch_node_timeseries：按节点拉区间序列。
 #[async_trait]
 pub trait VmRepository: Send + Sync {
-    async fn fetch_snapshot_data(&self, query: &TimeRangeQuery)
-    -> Result<VmSnapshotData, AppError>;
+    async fn fetch_snapshot_data(
+        &self,
+        query: &TimeRangeQuery,
+        filters: Option<Vec<PackageFilter>>,
+    ) -> Result<VmSnapshotData, AppError>;
     async fn fetch_miss_metrics(&self, query: &TimeRangeQuery)
     -> Result<MetricsSnapshot, AppError>;
     async fn fetch_node_timeseries(
@@ -45,7 +50,7 @@ pub trait VmRepository: Send + Sync {
     async fn fetch_packages_timeseries(
         &self,
         query: &TimeRangeQuery,
-        package_name: &str,
+        filters: &[(String, String)],
         max_data_points: Option<usize>,
     ) -> Result<Vec<NodeTimeSeries>, AppError>;
     async fn fetch_source_timeseries(
@@ -115,22 +120,6 @@ impl VmHttpRepository {
     /// 转义 PromQL 双引号字符串字面量。
     fn escape_promql_string(v: &str) -> String {
         v.replace('\\', r"\\").replace('"', r#"\""#)
-    }
-
-    /// 转义 PromQL 正则中的字面量字符，避免包名中包含特殊符号时误匹配。
-    pub fn escape_promql_regex(v: &str) -> String {
-        let mut out = String::with_capacity(v.len());
-        for ch in v.chars() {
-            match ch {
-                '\\' | '.' | '+' | '*' | '?' | '^' | '$' | '(' | ')' | '[' | ']' | '{' | '}'
-                | '|' => {
-                    out.push('\\');
-                    out.push(ch);
-                }
-                _ => out.push(ch),
-            }
-        }
-        out
     }
 
     /// 生成 VictoriaMetrics counter 增量表达式。
@@ -592,6 +581,7 @@ impl VmRepository for VmHttpRepository {
     async fn fetch_snapshot_data(
         &self,
         query: &TimeRangeQuery,
+        filters: Option<Vec<PackageFilter>>,
     ) -> Result<VmSnapshotData, AppError> {
         let at_start = query.start_time.timestamp();
         let at_end = query.end_time.timestamp();
@@ -608,10 +598,46 @@ impl VmRepository for VmHttpRepository {
             r#"sum by (source_type, source_name) ({})"#,
             Self::counter_increase_expr("wparse_receive_data", &window)
         );
-        let parse_count_q = format!(
-            r#"sum by (package_name, rule_name) ({})"#,
-            Self::counter_increase_expr("wparse_parse_all", &window)
-        );
+
+        let parse_count_q = if let Some(filters) = filters {
+            let subqueries: Vec<String> = filters
+                .iter()
+                .map(|f| {
+                    let pkg_regex = escape_regex_chars(&f.package_name);
+                    let rule_regex = if f.rule_names.is_empty() {
+                        ".*".to_string()
+                    } else {
+                        f.rule_names
+                            .iter()
+                            .map(|r| escape_regex_chars(r))
+                            .collect::<Vec<_>>()
+                            .join("|")
+                    };
+                    let selector = format!(
+                        r#"wparse_parse_all{{package_name=~"{}", rule_name=~"{}"}}"#,
+                        pkg_regex, rule_regex
+                    );
+                    format!(
+                        r#"sum by (package_name, rule_name) ({})"#,
+                        Self::counter_increase_expr(&selector, &window)
+                    )
+                })
+                .collect();
+            if subqueries.is_empty() {
+                format!(
+                    r#"sum by (package_name, rule_name) ({})"#,
+                    Self::counter_increase_expr("wparse_parse_all", &window)
+                )
+            } else {
+                subqueries.join(" or ")
+            }
+        } else {
+            format!(
+                r#"sum by (package_name, rule_name) ({})"#,
+                Self::counter_increase_expr("wparse_parse_all", &window)
+            )
+        };
+
         let sink_group_count_q = format!(
             r#"sum by (sink_group) ({})"#,
             Self::counter_increase_expr(
@@ -872,7 +898,7 @@ impl VmRepository for VmHttpRepository {
         let package_selector = if package_name == ".*" {
             ".*".to_string()
         } else {
-            format!("^{}$", Self::escape_promql_regex(package_name))
+            format!("^{}$", escape_regex_chars(package_name))
         };
         let rule_selector = if rule_names == ".*" {
             ".*".to_string()
@@ -880,7 +906,7 @@ impl VmRepository for VmHttpRepository {
             // 已经是 | 分隔的正则表达式（来自 node_ids），直接使用
             format!("^{}$", rule_names)
         } else {
-            format!("^{}$", Self::escape_promql_regex(rule_names))
+            format!("^{}$", escape_regex_chars(rule_names))
         };
         let query_prom = format!(
             r#"(sum by (package_name, rule_name) ({}))/{}"#,
@@ -913,34 +939,38 @@ impl VmRepository for VmHttpRepository {
     async fn fetch_packages_timeseries(
         &self,
         query: &TimeRangeQuery,
-        package_name: &str,
+        filters: &[(String, String)],
         max_data_points: Option<usize>,
     ) -> Result<Vec<NodeTimeSeries>, AppError> {
+        if filters.is_empty() {
+            return Ok(Vec::new());
+        }
         let (_, rate_window, _) = Self::auto_step_for_timeseries(query, max_data_points);
         let rate_window_secs = rate_window
             .trim_end_matches('s')
             .parse::<i64>()
             .unwrap_or(0);
-        let package_selector = if package_name == ".*" {
-            ".*".to_string()
-        } else if package_name.contains('|') {
-            // 已经是 | 分隔的正则表达式（来自 node_ids），直接使用
-            format!("^{}$", package_name)
-        } else {
-            format!("^{}$", Self::escape_promql_regex(package_name))
-        };
 
-        let query_prom = format!(
-            r#"(sum by (package_name) ({}))/{}"#,
-            Self::counter_increase_expr(
-                &format!(
-                    r#"wparse_parse_all{{package_name=~"{}"}}"#,
-                    package_selector
-                ),
-                &rate_window,
-            ),
-            rate_window_secs
-        );
+        // 每个 filter 构建独立的 sum by (package_name) 子查询，用 or 连接，
+        // 避免 package_name 和 rule_name 正则跨 package 误匹配。
+        let subqueries: Vec<String> = filters
+            .iter()
+            .map(|(pkg_regex, rule_regex)| {
+                format!(
+                    r#"(sum by (package_name) ({}))/{}"#,
+                    Self::counter_increase_expr(
+                        &format!(
+                            r#"wparse_parse_all{{package_name=~"^{}$",rule_name=~"^{}$"}}"#,
+                            pkg_regex, rule_regex
+                        ),
+                        &rate_window,
+                    ),
+                    rate_window_secs
+                )
+            })
+            .collect();
+
+        let query_prom = subqueries.join(" or ");
         self.fetch_scope_timeseries_internal(query, max_data_points, query_prom, |metric| {
             metric
                 .get("package_name")
@@ -991,7 +1021,7 @@ impl VmRepository for VmHttpRepository {
             .parse::<i64>()
             .unwrap_or(0);
         let group_selector = sink_group
-            .map(|g| format!(r#",sink_group=~"^{}$""#, Self::escape_promql_regex(g)))
+            .map(|g| format!(r#",sink_group=~"^{}$""#, escape_regex_chars(g)))
             .unwrap_or_default();
         let query_prom = format!(
             r#"(sum by (sink_group, sink_name) ({}))/{}"#,

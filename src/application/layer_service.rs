@@ -3,6 +3,7 @@ use crate::domain::model::{
     NodeMetricsItem, NodeTimeSeries, SnapshotMeta, TimeRangeQuery,
 };
 use crate::infrastructure::vm_repository::{VmRepository, VmSnapshotData};
+use crate::interfaces::vm::handlers::PackageFilter;
 use crate::shared::config::AppConfig;
 use crate::shared::error::AppError;
 use crate::shared::hash::stable_hash_json;
@@ -294,14 +295,24 @@ impl LayerService {
     pub async fn get_layers_snapshot(
         &self,
         query: TimeRangeQuery,
+        filters: Option<Vec<PackageFilter>>,
     ) -> Result<LayerSnapshot, AppError> {
         debug!(
             start_time = %query.start_time,
             end_time = %query.end_time,
             "layer_service.layers_snapshot.start"
         );
-        let raw_snapshot = self.vm_repo.fetch_snapshot_data(&query).await?;
-        let snapshot_data = self.merge_snapshot_with_cache(raw_snapshot).await;
+        // 有过滤条件时只返回 VM 实际查到的数据，避免缓存填零导致前端震荡。
+        let filters_active = filters.as_ref().is_some_and(|f| !f.is_empty());
+        let raw_snapshot = self.vm_repo.fetch_snapshot_data(&query, filters).await?;
+
+        let snapshot_data = if filters_active {
+            let mut cache = self.node_cache.write().await;
+            cache.upsert_from_snapshot(&raw_snapshot);
+            raw_snapshot
+        } else {
+            self.merge_snapshot_with_cache(raw_snapshot).await
+        };
 
         // 版本号采用“结构稳定哈希”，用于前端识别层结构是否变化。
         let versions = LayerVersions {
@@ -349,8 +360,9 @@ impl LayerService {
         &self,
         query: TimeRangeQuery,
         node_ids: Option<Vec<String>>,
+        filters: Option<Vec<PackageFilter>>,
     ) -> Result<LayersMetricsResponse, AppError> {
-        let snapshot = self.get_layers_snapshot(query).await?;
+        let snapshot = self.get_layers_snapshot(query, filters).await?;
 
         let mut items = Vec::new();
 
@@ -419,7 +431,7 @@ impl LayerService {
         query: TimeRangeQuery,
     ) -> Result<NodeDetail, AppError> {
         debug!(node_id = %node_id, "layer_service.node_detail.start");
-        let snapshot = self.get_layers_snapshot(query.clone()).await?;
+        let snapshot = self.get_layers_snapshot(query.clone(), None).await?;
         if let Some(detail) =
             snapshot
                 .sources
@@ -540,31 +552,33 @@ impl LayerService {
         &self,
         query: TimeRangeQuery,
         max_data_points: Option<usize>,
-        node_ids: &[String],
+        filters: Vec<PackageFilter>,
     ) -> Result<Vec<NodeTimeSeries>, AppError> {
-        // 逐条 escape 后以 | 拼接为正则，传给 repository
-        let package_name = node_ids
+        // 每个 filter 构建 (package_regex, rule_regex) 对，保留 package-rule 关联
+        let pairs: Vec<(String, String)> = filters
             .iter()
-            .map(|id| {
-                let mut out = String::with_capacity(id.len());
-                for ch in id.chars() {
-                    match ch {
-                        '\\' | '.' | '+' | '*' | '?' | '^' | '$' | '(' | ')' | '[' | ']' | '{'
-                        | '}' | '|' => {
-                            out.push('\\');
-                            out.push(ch);
-                        }
-                        _ => out.push(ch),
-                    }
+            .filter_map(|f| {
+                if f.rule_names.is_empty() {
+                    return None;
                 }
-                out
+                let pkg_regex = escape_regex_chars(&f.package_name);
+                let rule_regex = f
+                    .rule_names
+                    .iter()
+                    .map(|r| escape_regex_chars(r))
+                    .collect::<Vec<_>>()
+                    .join("|");
+                Some((pkg_regex, rule_regex))
             })
-            .collect::<Vec<_>>()
-            .join("|");
+            .collect();
+
+        if pairs.is_empty() {
+            return Ok(Vec::new());
+        }
 
         let timeseries = self
             .vm_repo
-            .fetch_packages_timeseries(&query, &package_name, max_data_points)
+            .fetch_packages_timeseries(&query, &pairs, max_data_points)
             .await?;
 
         Ok(timeseries)
@@ -574,37 +588,24 @@ impl LayerService {
     pub async fn get_parse_timeseries(
         &self,
         query: TimeRangeQuery,
-        package_name: Option<String>,
-        rule_name: Option<String>,
+        package_name: Vec<String>,
+        rule_name: Vec<String>,
         max_data_points: Option<usize>,
-        node_ids: &Option<Vec<String>>,
     ) -> Result<Vec<NodeTimeSeries>, AppError> {
-        let package_name = package_name.as_deref().unwrap_or(".*");
-        let mut rule_name = rule_name.unwrap_or(".*".to_string());
-        // 逐条 escape 后以 | 拼接为正则，传给 repository
-        if let Some(node_ids) = node_ids {
-            rule_name = node_ids
-                .iter()
-                .map(|id| {
-                    let mut out = String::with_capacity(id.len());
-                    for ch in id.chars() {
-                        match ch {
-                            '\\' | '.' | '+' | '*' | '?' | '^' | '$' | '(' | ')' | '[' | ']'
-                            | '{' | '}' | '|' => {
-                                out.push('\\');
-                                out.push(ch);
-                            }
-                            _ => out.push(ch),
-                        }
-                    }
-                    out
-                })
-                .collect::<Vec<_>>()
-                .join("|");
-        };
+        let package_name = package_name
+            .iter()
+            .map(|id| escape_regex_chars(id))
+            .collect::<Vec<_>>()
+            .join("|");
+
+        let rule_name = rule_name
+            .iter()
+            .map(|id| escape_regex_chars(id))
+            .collect::<Vec<_>>()
+            .join("|");
         let timeseries = self
             .vm_repo
-            .fetch_parse_timeseries(&query, package_name, &rule_name, max_data_points)
+            .fetch_parse_timeseries(&query, &package_name, &rule_name, max_data_points)
             .await?;
         Ok(timeseries)
     }
@@ -638,4 +639,18 @@ impl LayerService {
           "vm_base_url": self.config.vm_base_url
         })
     }
+}
+
+pub fn escape_regex_chars(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for ch in s.chars() {
+        match ch {
+            '\\' | '.' | '+' | '*' | '?' | '^' | '$' | '(' | ')' | '[' | ']' | '{' | '}' | '|' => {
+                out.push('\\');
+                out.push(ch);
+            }
+            _ => out.push(ch),
+        }
+    }
+    out
 }

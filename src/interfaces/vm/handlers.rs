@@ -20,6 +20,7 @@ pub struct MetricsRequest {
     pub start_time: String,
     pub end_time: String,
     pub node_ids: Option<String>,
+    pub filters: Option<Vec<PackageFilter>>,
 }
 
 /// HTTP 查询参数：节点时序请求。
@@ -53,7 +54,7 @@ pub async fn get_layers_snapshot(
         );
         AppErrorResponse::from(e)
     })?;
-    let data = svc.get_layers_snapshot(query).await.map_err(|e| {
+    let data = svc.get_layers_snapshot(query, None).await.map_err(|e| {
         error!(error = %e, "vm.handlers.layers_snapshot.failed");
         AppErrorResponse::from(e)
     })?;
@@ -61,11 +62,12 @@ pub async fn get_layers_snapshot(
 }
 
 /// 获取分层指标快照（可按 node_ids 过滤）。
-#[get("/layers/metrics")]
+#[post("/layers/metrics")]
 pub async fn get_layers_metrics(
     svc: web::Data<LayerService>,
-    req: web::Query<MetricsRequest>,
+    req: web::Json<MetricsRequest>,
 ) -> Result<HttpResponse> {
+    let req = req.into_inner();
     debug!(
         start_time = %req.start_time,
         end_time = %req.end_time,
@@ -87,10 +89,13 @@ pub async fn get_layers_metrics(
             .collect::<Vec<_>>()
     });
 
-    let data = svc.get_layers_metrics(query, node_ids).await.map_err(|e| {
-        error!(error = %e, "vm.handlers.layers_metrics.failed");
-        AppErrorResponse::from(e)
-    })?;
+    let data = svc
+        .get_layers_metrics(query, node_ids, req.filters)
+        .await
+        .map_err(|e| {
+            error!(error = %e, "vm.handlers.layers_metrics.failed");
+            AppErrorResponse::from(e)
+        })?;
     Ok(HttpResponse::Ok().json(ApiResponse::ok(data)))
 }
 
@@ -178,43 +183,53 @@ pub enum TimeSeriesScope {
 #[derive(Debug, Deserialize)]
 pub struct NodesTimeSeriesRequest {
     pub scope: Option<TimeSeriesScope>,
-    pub package_name: Option<String>,
-    pub rule_name: Option<String>,
+    pub package_name: Vec<String>,
+    pub rule_name: Vec<String>,
     pub sink_group: Option<String>,
     pub start_time: String,
     pub end_time: String,
     pub max_data_points: Option<usize>,
-    pub node_ids: Option<Vec<String>>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PackageFilter {
+    pub package_name: String,
+    pub rule_names: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PackagesTimeSeriesRequest {
+    pub start_time: String,
+    pub end_time: String,
+    pub max_data_points: Option<usize>,
+    pub filters: Vec<PackageFilter>,
 }
 
 #[post("/packages/timeseries")]
 pub async fn get_packages_timeseries(
     svc: web::Data<LayerService>,
-    req: web::Json<NodesTimeSeriesRequest>,
+    req: web::Json<PackagesTimeSeriesRequest>,
 ) -> Result<HttpResponse> {
     let query = TimeRangeQuery::new(&req.start_time, &req.end_time).map_err(|e| {
         error!(
             start_time = %req.start_time,
             end_time = %req.end_time,
             error = %e,
-            "vm.handlers.node_timeseries.invalid_params"
+            "vm.handlers.packages_timeseries.invalid_params"
         );
         AppErrorResponse::from(e)
     })?;
-
-    let data = if let Some(node_ids) = req.node_ids.as_ref() {
-        svc.get_packages_timeseries(query, req.max_data_points, node_ids)
-            .await
-            .map_err(|e| {
-                error!(
-                    error = %e,
-                    "vm.handlers.packages_timeseries_with_node_ids.failed"
-                );
-                AppErrorResponse::from(e)
-            })?
-    } else {
-        Vec::new()
-    };
+    let req = req.into_inner();
+    let data = svc
+        .get_packages_timeseries(query, req.max_data_points, req.filters)
+        .await
+        .map_err(|e| {
+            error!(
+                error = %e,
+                "vm.handlers.packages_timeseries.failed"
+            );
+            AppErrorResponse::from(e)
+        })?;
     Ok(HttpResponse::Ok().json(ApiResponse::ok(data)))
 }
 
@@ -260,7 +275,6 @@ pub async fn get_nodes_timeseries(
                 req.package_name.clone(),
                 req.rule_name.clone(),
                 req.max_data_points,
-                &req.node_ids,
             )
             .await
             .map_err(|e| {
