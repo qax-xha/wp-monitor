@@ -95,7 +95,7 @@ export async function fetchParseTimeSeries(
   maxDataPoints?: number,
   packageName?: string,
   sinkGroup?: string,
-  nodeIds?: string[],
+  ruleNames?: string[],
 ) {
   const { start: normalizedStart, end: normalizedEnd } = normalizeTimeRange(
     startTime,
@@ -106,29 +106,32 @@ export async function fetchParseTimeSeries(
     scope,
     start_time: normalizedStart,
     end_time: normalizedEnd,
+    package_name: packageName ? [packageName] : [],
+    rule_name: ruleNames ?? [],
   };
   if (safeMaxDataPoints) body.max_data_points = safeMaxDataPoints;
-  if (packageName) body.package_name = packageName;
   if (sinkGroup) body.sink_group = sinkGroup;
-  if (nodeIds && nodeIds.length > 0) body.node_ids = nodeIds;
   return requestPostJson<NodeTimeSeries[]>("/api/v1/wp-monitor/nodes/timeseries", body);
 }
 
-/** 获取 package 级别时序数据（按 node_ids 过滤） */
+/** 获取 package 级别时序数据 */
 export async function fetchPackagesTimeSeries(
   startTime: string,
   endTime: string,
   maxDataPoints?: number,
-  nodeIds?: string[],
+  filters?: Array<{ packageName: string; ruleNames: string[] }>,
 ) {
   const { start: normalizedStart, end: normalizedEnd } = normalizeTimeRange(startTime, endTime);
   const safeMaxDataPoints = normalizeMaxDataPoints(maxDataPoints);
   const body: Record<string, unknown> = {
     start_time: normalizedStart,
     end_time: normalizedEnd,
+    filters: (filters ?? []).map((f) => ({
+      package_name: f.packageName,
+      rule_names: f.ruleNames,
+    })),
   };
   if (safeMaxDataPoints) body.max_data_points = safeMaxDataPoints;
-  if (nodeIds && nodeIds.length > 0) body.node_ids = nodeIds;
   return requestPostJson<NodeTimeSeries[]>("/api/v1/wp-monitor/packages/timeseries", body);
 }
 
@@ -151,20 +154,26 @@ export async function fetchMetrics(
   startTime: string,
   endTime: string,
   nodeIds?: string[],
+  filters?: Array<{ packageName: string; ruleNames: string[] }>,
 ) {
   const { start: normalizedStart, end: normalizedEnd } = normalizeTimeRange(
     startTime,
     endTime,
   );
-  const params = new URLSearchParams({
+  const body: Record<string, unknown> = {
     start_time: normalizedStart,
     end_time: normalizedEnd,
-  });
+  };
   if (nodeIds && nodeIds.length > 0) {
-    params.set("node_ids", nodeIds.join(","));
+    body.node_ids = nodeIds.join(",");
   }
-  const url = `/api/v1/wp-monitor/layers/metrics?${params.toString()}`;
-  const data = await requestJson<LayersMetricsResponse>(url);
+  if (filters && filters.length > 0) {
+    body.filters = filters.map((f) => ({
+      package_name: f.packageName,
+      rule_names: f.ruleNames,
+    }));
+  }
+  const data = await requestPostJson<LayersMetricsResponse>("/api/v1/wp-monitor/layers/metrics", body);
   return data.data;
 }
 
