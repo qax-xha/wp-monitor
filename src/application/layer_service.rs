@@ -536,19 +536,75 @@ impl LayerService {
             .await
     }
 
+    pub async fn get_packages_timeseries(
+        &self,
+        query: TimeRangeQuery,
+        max_data_points: Option<usize>,
+        node_ids: &[String],
+    ) -> Result<Vec<NodeTimeSeries>, AppError> {
+        // 逐条 escape 后以 | 拼接为正则，传给 repository
+        let package_name = node_ids
+            .iter()
+            .map(|id| {
+                let mut out = String::with_capacity(id.len());
+                for ch in id.chars() {
+                    match ch {
+                        '\\' | '.' | '+' | '*' | '?' | '^' | '$' | '(' | ')' | '[' | ']' | '{'
+                        | '}' | '|' => {
+                            out.push('\\');
+                            out.push(ch);
+                        }
+                        _ => out.push(ch),
+                    }
+                }
+                out
+            })
+            .collect::<Vec<_>>()
+            .join("|");
+
+        let timeseries = self
+            .vm_repo
+            .fetch_packages_timeseries(&query, &package_name, max_data_points)
+            .await?;
+
+        Ok(timeseries)
+    }
+
     /// 获取 parse 层节点时间序列。
     pub async fn get_parse_timeseries(
         &self,
         query: TimeRangeQuery,
         package_name: Option<String>,
-        log_type: Option<String>,
+        rule_name: Option<String>,
         max_data_points: Option<usize>,
+        node_ids: &Option<Vec<String>>,
     ) -> Result<Vec<NodeTimeSeries>, AppError> {
         let package_name = package_name.as_deref().unwrap_or(".*");
-        let log_type = log_type.as_deref().unwrap_or(".*");
+        let mut rule_name = rule_name.unwrap_or(".*".to_string());
+        // 逐条 escape 后以 | 拼接为正则，传给 repository
+        if let Some(node_ids) = node_ids {
+            rule_name = node_ids
+                .iter()
+                .map(|id| {
+                    let mut out = String::with_capacity(id.len());
+                    for ch in id.chars() {
+                        match ch {
+                            '\\' | '.' | '+' | '*' | '?' | '^' | '$' | '(' | ')' | '[' | ']'
+                            | '{' | '}' | '|' => {
+                                out.push('\\');
+                                out.push(ch);
+                            }
+                            _ => out.push(ch),
+                        }
+                    }
+                    out
+                })
+                .collect::<Vec<_>>()
+                .join("|");
+        };
         let timeseries = self
             .vm_repo
-            .fetch_parse_timeseries(&query, package_name, log_type, max_data_points)
+            .fetch_parse_timeseries(&query, package_name, &rule_name, max_data_points)
             .await?;
         Ok(timeseries)
     }

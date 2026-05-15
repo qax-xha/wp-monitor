@@ -2,7 +2,7 @@ use crate::application::layer_service::LayerService;
 use crate::domain::model::TimeRangeQuery;
 use crate::shared::api::{ApiResponse, ReadyResponse, VersionResponse};
 use crate::shared::error::AppErrorResponse;
-use actix_web::{HttpResponse, Result, get, web};
+use actix_web::{HttpResponse, Result, get, post, web};
 use serde::Deserialize;
 use tracing::{debug, error};
 
@@ -184,12 +184,44 @@ pub struct NodesTimeSeriesRequest {
     pub start_time: String,
     pub end_time: String,
     pub max_data_points: Option<usize>,
+    pub node_ids: Option<Vec<String>>,
 }
 
-#[get("/nodes/timeseries")]
+#[post("/packages/timeseries")]
+pub async fn get_packages_timeseries(
+    svc: web::Data<LayerService>,
+    req: web::Json<NodesTimeSeriesRequest>,
+) -> Result<HttpResponse> {
+    let query = TimeRangeQuery::new(&req.start_time, &req.end_time).map_err(|e| {
+        error!(
+            start_time = %req.start_time,
+            end_time = %req.end_time,
+            error = %e,
+            "vm.handlers.node_timeseries.invalid_params"
+        );
+        AppErrorResponse::from(e)
+    })?;
+
+    let data = if let Some(node_ids) = req.node_ids.as_ref() {
+        svc.get_packages_timeseries(query, req.max_data_points, node_ids)
+            .await
+            .map_err(|e| {
+                error!(
+                    error = %e,
+                    "vm.handlers.packages_timeseries_with_node_ids.failed"
+                );
+                AppErrorResponse::from(e)
+            })?
+    } else {
+        Vec::new()
+    };
+    Ok(HttpResponse::Ok().json(ApiResponse::ok(data)))
+}
+
+#[post("/nodes/timeseries")]
 pub async fn get_nodes_timeseries(
     svc: web::Data<LayerService>,
-    req: web::Query<NodesTimeSeriesRequest>,
+    req: web::Json<NodesTimeSeriesRequest>,
 ) -> Result<HttpResponse> {
     debug!(
         start_time = %req.start_time,
@@ -228,6 +260,7 @@ pub async fn get_nodes_timeseries(
                 req.package_name.clone(),
                 req.rule_name.clone(),
                 req.max_data_points,
+                &req.node_ids,
             )
             .await
             .map_err(|e| {

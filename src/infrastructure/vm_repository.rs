@@ -39,7 +39,13 @@ pub trait VmRepository: Send + Sync {
         &self,
         query: &TimeRangeQuery,
         package_name: &str,
-        rule_name: &str,
+        rule_names: &str,
+        max_data_points: Option<usize>,
+    ) -> Result<Vec<NodeTimeSeries>, AppError>;
+    async fn fetch_packages_timeseries(
+        &self,
+        query: &TimeRangeQuery,
+        package_name: &str,
         max_data_points: Option<usize>,
     ) -> Result<Vec<NodeTimeSeries>, AppError>;
     async fn fetch_source_timeseries(
@@ -112,7 +118,7 @@ impl VmHttpRepository {
     }
 
     /// 转义 PromQL 正则中的字面量字符，避免包名中包含特殊符号时误匹配。
-    fn escape_promql_regex(v: &str) -> String {
+    pub fn escape_promql_regex(v: &str) -> String {
         let mut out = String::with_capacity(v.len());
         for ch in v.chars() {
             match ch {
@@ -855,7 +861,7 @@ impl VmRepository for VmHttpRepository {
         &self,
         query: &TimeRangeQuery,
         package_name: &str,
-        rule_name: &str,
+        rule_names: &str,
         max_data_points: Option<usize>,
     ) -> Result<Vec<NodeTimeSeries>, AppError> {
         let (_, rate_window, _) = Self::auto_step_for_timeseries(query, max_data_points);
@@ -868,10 +874,13 @@ impl VmRepository for VmHttpRepository {
         } else {
             format!("^{}$", Self::escape_promql_regex(package_name))
         };
-        let rule_selector = if rule_name == ".*" {
+        let rule_selector = if rule_names == ".*" {
             ".*".to_string()
+        } else if rule_names.contains('|') {
+            // 已经是 | 分隔的正则表达式（来自 node_ids），直接使用
+            format!("^{}$", rule_names)
         } else {
-            format!("^{}$", Self::escape_promql_regex(rule_name))
+            format!("^{}$", Self::escape_promql_regex(rule_names))
         };
         let query_prom = format!(
             r#"(sum by (package_name, rule_name) ({}))/{}"#,
@@ -893,7 +902,50 @@ impl VmRepository for VmHttpRepository {
                 .get("rule_name")
                 .cloned()
                 .unwrap_or_else(|| "unknown".to_string());
-            format!("log:{}:{}", package_name, rule_name)
+            format!("{}:{}", package_name, rule_name)
+        })
+        .await
+    }
+
+    /**
+     * 获取多个节点的时序数据。package层
+     */
+    async fn fetch_packages_timeseries(
+        &self,
+        query: &TimeRangeQuery,
+        package_name: &str,
+        max_data_points: Option<usize>,
+    ) -> Result<Vec<NodeTimeSeries>, AppError> {
+        let (_, rate_window, _) = Self::auto_step_for_timeseries(query, max_data_points);
+        let rate_window_secs = rate_window
+            .trim_end_matches('s')
+            .parse::<i64>()
+            .unwrap_or(0);
+        let package_selector = if package_name == ".*" {
+            ".*".to_string()
+        } else if package_name.contains('|') {
+            // 已经是 | 分隔的正则表达式（来自 node_ids），直接使用
+            format!("^{}$", package_name)
+        } else {
+            format!("^{}$", Self::escape_promql_regex(package_name))
+        };
+
+        let query_prom = format!(
+            r#"(sum by (package_name) ({}))/{}"#,
+            Self::counter_increase_expr(
+                &format!(
+                    r#"wparse_parse_all{{package_name=~"{}"}}"#,
+                    package_selector
+                ),
+                &rate_window,
+            ),
+            rate_window_secs
+        );
+        self.fetch_scope_timeseries_internal(query, max_data_points, query_prom, |metric| {
+            metric
+                .get("package_name")
+                .cloned()
+                .unwrap_or_else(|| "unknown".to_string())
         })
         .await
     }

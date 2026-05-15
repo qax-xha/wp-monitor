@@ -22,6 +22,7 @@ import {
   fetchMetrics,
   fetchNodeDetail,
   fetchNodeTimeSeries,
+  fetchPackagesTimeSeries,
   fetchParseTimeSeries,
   fetchSnapshot,
   fetchVersion,
@@ -229,6 +230,15 @@ export default function WpMonitorPage() {
   const [refreshSpin, setRefreshSpin] = useState(false);
   const [detailTrendAutoRefresh, setDetailTrendAutoRefresh] = useState(true);
 
+  const [parseFilter, setParseFilter] = useState<"withData" | "noData">("withData");
+  const PARSE_PAGE_SIZE = 20;
+  const [parsePage, setParsePage] = useState(1);
+  const scopeModeRef = useRef<"log" | "package">("log");
+  const initialScopeOpened = useRef(false);
+  const snapshotRef = useRef(snapshot);
+  snapshotRef.current = snapshot;
+  const parseFilterRef = useRef(parseFilter);
+  parseFilterRef.current = parseFilter;
   const [parseQuery, setParseQuery] = useState("");
   const [parseSearchOpen, setParseSearchOpen] = useState(false);
   const [parseSearchActiveIndex, setParseSearchActiveIndex] = useState(0);
@@ -275,6 +285,15 @@ export default function WpMonitorPage() {
     }
   }
 
+  function zeroSeriesForSilent(seriesList: NodeTimeSeries[]): NodeTimeSeries[] {
+    if (parseFilterRef.current !== "noData") return seriesList;
+    return seriesList.map((s) => ({
+      ...s,
+      log_rate_eps: s.log_rate_eps.map((p) => ({ ...p, value: 0 })),
+      log_count: s.log_count.map((p) => ({ ...p, value: 0 })),
+    }));
+  }
+
   async function refreshMetricsOnly() {
     if (!snapshot) return;
     triggerRefreshSpin();
@@ -304,6 +323,14 @@ export default function WpMonitorPage() {
   useEffect(() => {
     void loadSnapshot();
   }, []);
+
+  // 默认打开 Parse 趋势图
+  useEffect(() => {
+    if (snapshot && !initialScopeOpened.current) {
+      initialScopeOpened.current = true;
+      void openParseScope();
+    }
+  }, [snapshot]);
 
   useEffect(() => {
     let cancelled = false;
@@ -346,7 +373,7 @@ export default function WpMonitorPage() {
         selectedNode &&
         !detailPanelRef.current?.contains(target) &&
         !(target as Element).closest(
-          ".node, .node__leaf, .lane-title",
+          ".node, .node__leaf, .lane-title, .parse-search-item, .filter-toggle",
         )
       ) {
         setSelectedNode("");
@@ -429,6 +456,40 @@ export default function WpMonitorPage() {
       snapshot.miss.metrics.log_rate_eps > 0
     );
   }, [snapshot]);
+  const filteredParses = useMemo(() => {
+    if (!snapshot) return [];
+    return snapshot.parses.filter((p) => {
+      if (parseFilter === "withData") return p.metrics.log_count > 0;
+      if (parseFilter === "noData") return p.logs.some((l) => l.metrics.log_count === 0);
+      return true;
+    });
+  }, [snapshot, parseFilter]);
+
+  const parsePages = useMemo(() => {
+    const pages: (typeof filteredParses)[] = [];
+    let cur: typeof filteredParses = [];
+    let curCnt = 0;
+    for (const pkg of filteredParses) {
+      const cnt = parseFilter === "withData"
+        ? pkg.logs.filter((l) => l.metrics.log_count > 0).length
+        : parseFilter === "noData"
+          ? pkg.logs.filter((l) => l.metrics.log_count === 0).length
+          : pkg.logs.length;
+      if (curCnt >= PARSE_PAGE_SIZE && cur.length > 0) {
+        pages.push(cur);
+        cur = [];
+        curCnt = 0;
+      }
+      cur.push(pkg);
+      curCnt += cnt;
+    }
+    if (cur.length > 0) pages.push(cur);
+    return pages.length > 0 ? pages : [[]];
+  }, [filteredParses, parseFilter]);
+
+  const parseTotalPages = parsePages.length;
+  const parsePageItems = parsePages[Math.min(parsePage - 1, parseTotalPages - 1)] || [];
+
   const missPageItems = useMemo(() => missLogs, [missLogs]);
   const detailNodePillType = useMemo(() => {
     if (!selectedNode) return "generic";
@@ -547,16 +608,38 @@ export default function WpMonitorPage() {
         const nextEndMs = nowWithLagMs();
         const nextStart = new Date(nextEndMs - durationMs).toISOString();
         const nextEnd = new Date(nextEndMs).toISOString();
-        const timeseriesResp = await fetchParseTimeSeries(
-          scopeSeriesRequest.scope,
-          nextStart,
-          nextEnd,
-          estimateMaxDataPoints(),
-          scopeSeriesRequest.packageName,
-          scopeSeriesRequest.sinkGroup,
-        );
+        let timeseriesResp;
+        if (scopeModeRef.current === "package") {
+          timeseriesResp = await fetchPackagesTimeSeries(
+            nextStart, nextEnd, estimateMaxDataPoints(),
+            filteredParses.map((p) => p.package_name),
+          );
+        } else {
+          let logNodeIds: string[] | undefined;
+          const req = scopeSeriesRequest;
+          if (req.scope === "parse" && req.packageName) {
+            const snap = snapshotRef.current;
+            const filter = parseFilterRef.current;
+            const pkg = snap?.parses.find((p) => p.package_name === req.packageName);
+            if (pkg) {
+              const logs = filter === "withData"
+                ? pkg.logs.filter((l) => l.metrics.log_count > 0)
+                : filter === "noData"
+                  ? pkg.logs.filter((l) => l.metrics.log_count === 0)
+                  : pkg.logs;
+              logNodeIds = logs.map((l) => l.name);
+            }
+          }
+          timeseriesResp = await fetchParseTimeSeries(
+            scopeSeriesRequest.scope,
+            nextStart, nextEnd, estimateMaxDataPoints(),
+            scopeSeriesRequest.packageName,
+            scopeSeriesRequest.sinkGroup,
+            logNodeIds,
+          );
+        }
         if (cancelled) return;
-        setParseSeriesList(timeseriesResp.data ?? []);
+        setParseSeriesList(zeroSeriesForSilent(timeseriesResp.data ?? []));
         setDetailStartTime(nextStart);
         setDetailEndTime(nextEnd);
         setDrawerError("");
@@ -632,6 +715,37 @@ export default function WpMonitorPage() {
   useEffect(() => {
     setParseSearchActiveIndex(0);
   }, [parseQuery, parseSearchOpen]);
+
+  // 过滤切换且 scope 已打开时自动刷新
+  useEffect(() => {
+    if (!snapshot || !initialScopeOpened.current || detailViewMode !== "scope") return;
+
+    if (scopeModeRef.current === "package") {
+      void openParseScope();
+    } else if (scopeModeRef.current === "log" && scopeSeriesRequest) {
+      const req = scopeSeriesRequest;
+      let logNodeIds: string[] | undefined;
+      if (req.scope === "parse" && req.packageName) {
+        const pkg = snapshot.parses.find((p) => p.package_name === req.packageName);
+        if (pkg) {
+          const logs = parseFilter === "withData"
+            ? pkg.logs.filter((l) => l.metrics.log_count > 0)
+            : parseFilter === "noData"
+              ? pkg.logs.filter((l) => l.metrics.log_count === 0)
+              : pkg.logs;
+          logNodeIds = logs.map((l) => l.name);
+        }
+      }
+      void fetchParseTimeSeries(
+        req.scope, detailStartTime, detailEndTime, estimateMaxDataPoints(),
+        req.packageName, req.sinkGroup, logNodeIds,
+      ).then((resp) => {
+        setParseSeriesList(zeroSeriesForSilent(resp.data ?? []));
+      }).catch((err) => {
+        setDrawerError((err as Error).message || "Parse 时间序列获取失败");
+      });
+    }
+  }, [parseFilter]);
 
   useEffect(() => {
     scopeSeriesColorMapRef.current.clear();
@@ -842,6 +956,7 @@ export default function WpMonitorPage() {
     packageName?: string,
     sinkGroup?: string,
   ) {
+    scopeModeRef.current = "log";
     setDetailViewMode("scope");
     setDetailNodePill(normalizeNodePillText(title.replace(/ 节点趋势$/, "")));
     setHiddenScopeSeriesNames([]);
@@ -874,6 +989,19 @@ export default function WpMonitorPage() {
     setParseSeriesList(null);
     setParseSeriesTitle(title);
     try {
+      // 按活跃/静默收集应查询的 log node_ids
+      let logNodeIds: string[] | undefined;
+      if (scope === "parse" && packageName) {
+        const pkg = snapshot?.parses.find((p) => p.package_name === packageName);
+        if (pkg) {
+          const logs = parseFilter === "withData"
+            ? pkg.logs.filter((l) => l.metrics.log_count > 0)
+            : parseFilter === "noData"
+              ? pkg.logs.filter((l) => l.metrics.log_count === 0)
+              : pkg.logs;
+          logNodeIds = logs.map((l) => l.name);
+        }
+      }
       const timeseriesResp = await fetchParseTimeSeries(
         scope,
         currentStart,
@@ -881,8 +1009,52 @@ export default function WpMonitorPage() {
         estimateMaxDataPoints(),
         packageName,
         sinkGroup,
+        logNodeIds,
       );
-      setParseSeriesList(timeseriesResp.data ?? []);
+      setParseSeriesList(zeroSeriesForSilent(timeseriesResp.data ?? []));
+    } catch (err) {
+      setDrawerError((err as Error).message || "Parse 时间序列获取失败");
+    } finally {
+      setDrawerLoading(false);
+    }
+  }
+
+  async function openParseScope() {
+    scopeModeRef.current = "package";
+    const title = parseFilter === "withData" ? "Parse 层 Package 趋势（活跃）" : "Parse 层 Package 趋势（静默）";
+    setDetailViewMode("scope");
+    setDetailNodePill(normalizeNodePillText("Parse 层"));
+    setHiddenScopeSeriesNames([]);
+    setScopeSeriesRequest({ scope: "parse" });
+    let currentStart = startTime;
+    let currentEnd = endTime || nowWithLagIso();
+    const startMs = new Date(currentStart).getTime();
+    const endMs = new Date(currentEnd).getTime();
+    if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || startMs >= endMs) {
+      currentEnd = nowWithLagIso();
+      const fallbackStart = new Date(new Date(currentEnd).getTime() - 5 * 60 * 1000).toISOString();
+      currentStart = Number.isFinite(startMs) ? currentStart : fallbackStart;
+      if (new Date(currentStart).getTime() >= new Date(currentEnd).getTime()) currentStart = fallbackStart;
+    }
+    setSelectedNode("__parse__");
+    setDetailStartTime(currentStart);
+    setDetailEndTime(currentEnd);
+    setDrawerLoading(true);
+    setDrawerError("");
+    setDetail(null);
+    setSeries(null);
+    setParseSeriesList(null);
+    setParseSeriesTitle(title);
+    try {
+      if (filteredParses.length === 0) {
+        setParseSeriesList([]);
+      } else {
+        const timeseriesResp = await fetchPackagesTimeSeries(
+          currentStart, currentEnd, estimateMaxDataPoints(),
+          filteredParses.map((p) => p.package_name),
+        );
+        setParseSeriesList(zeroSeriesForSilent(timeseriesResp.data ?? []));
+      }
     } catch (err) {
       setDrawerError((err as Error).message || "Parse 时间序列获取失败");
     } finally {
@@ -1228,13 +1400,7 @@ export default function WpMonitorPage() {
               <div className="lane-head">
                 <div
                   className={`lane-title lane-title-clickable ${selectedNode === "__parse__" ? "selected" : ""}`}
-                  onClick={() =>
-                    void openParseTimeseries(
-                      "parse",
-                      "__parse__",
-                      "Parse 层全部节点趋势",
-                    )
-                  }
+                  onClick={() => void openParseScope()}
                 >
                   Parse
                 </div>
@@ -1305,17 +1471,30 @@ export default function WpMonitorPage() {
                   </div>
                 </div>
               </div>
+              <div className="filter-toggle" style={{ display: "flex", gap: 4, marginBottom: 8 }}>
+                <Button
+                  size="small"
+                  type={parseFilter === "withData" ? "primary" : "default"}
+                  onClick={() => { setParseFilter("withData"); setParsePage(1); }}
+                >
+                  活跃
+                </Button>
+                <Button
+                  size="small"
+                  type={parseFilter === "noData" ? "primary" : "default"}
+                  onClick={() => { setParseFilter("noData"); setParsePage(1); }}
+                >
+                  静默
+                </Button>
+              </div>
               <div className="lane-scroll">
-                {snapshot.parses.map((parseItem) => {
+                {parsePageItems.map((parseItem) => {
                   const isExpanded = expandedPackages.includes(parseItem.id);
-                  const handlePackageClick = () => {
-                    void openParseTimeseries(
-                      "parse",
-                      parseItem.id,
-                      `Package ${parseItem.package_name} 节点趋势`,
-                      parseItem.package_name,
-                    );
-                  };
+                  const showLogs = parseFilter === "withData"
+                    ? parseItem.logs.filter((l) => l.metrics.log_count > 0)
+                    : parseFilter === "noData"
+                      ? parseItem.logs.filter((l) => l.metrics.log_count === 0)
+                      : parseItem.logs;
                   return (
                     <section
                       key={parseItem.id}
@@ -1328,17 +1507,27 @@ export default function WpMonitorPage() {
                         }
                       }}
                       onMouseLeave={() => { setHoveredNode(""); setSweepNode(""); }}
-                      onClick={handlePackageClick}
                     >
                       <div className="node__header">
-                        <div>
+                        <div
+                          style={{ cursor: "pointer", flex: 1 }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void openParseTimeseries(
+                              "parse",
+                              parseItem.id,
+                              `Package ${parseItem.package_name} 节点趋势`,
+                              parseItem.package_name,
+                            );
+                          }}
+                        >
                           <div className="node__title">
                             {parseItem.package_name}
                           </div>
                           <div className="node__summary">
-                            {fmtRate(parseItem.metrics.log_rate_eps)} /{" "}
-                            {fmtCount(parseItem.metrics.log_count)} (汇总) ·{" "}
-                            {parseItem.logs.length} 个日志类型
+                            {fmtRate(parseFilter === "noData" ? 0 : parseItem.metrics.log_rate_eps)} /{" "}
+                            {fmtCount(parseFilter === "noData" ? 0 : parseItem.metrics.log_count)} (汇总) ·{" "}
+                            {showLogs.length} 个日志类型
                           </div>
                         </div>
                         <Button
@@ -1354,7 +1543,7 @@ export default function WpMonitorPage() {
                       </div>
                       {isExpanded && (
                         <div className="node__children">
-                          {parseItem.logs.map((logItem) => (
+                          {showLogs.map((logItem) => (
                             <article
                               key={logItem.id}
                               className={nodeClass(
@@ -1387,26 +1576,15 @@ export default function WpMonitorPage() {
                     </section>
                   );
                 })}
-
-                <article
-                  className={nodeClass(
-                    `node node--miss ${missHasData ? "node--miss-alert" : "node--miss-muted"}`,
-                    snapshot.miss.id,
-                    "miss",
-                  )}
-                  onMouseEnter={() => setHoveredNode(snapshot.miss.id)}
-                  onMouseLeave={() => setHoveredNode("")}
-                  onClick={() => void openDetail(snapshot.miss.id)}
-                >
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                    <div className="node__title" style={{ marginBottom: 0 }}>{snapshot.miss.name}</div>
-                    <div className="metric-badges" style={{ marginTop: 0 }}>
-                      <span className="metric-badge">速率 {fmtRate(snapshot.miss.metrics.log_rate_eps)}</span>
-                      <span className="metric-badge">数量 {fmtCount(snapshot.miss.metrics.log_count)}</span>
-                    </div>
+                {parseTotalPages > 1 && (
+                  <div style={{ display: "flex", justifyContent: "center", gap: 8, padding: "8px 0" }}>
+                    <Button size="small" disabled={parsePage <= 1} onClick={() => setParsePage((p) => p - 1)}>◀</Button>
+                    <span style={{ fontSize: 12, fontFamily: "var(--font-mono)", color: "var(--text-sub)", padding: "2px 0" }}>
+                      {parsePage} / {parseTotalPages} 页
+                    </span>
+                    <Button size="small" disabled={parsePage >= parseTotalPages} onClick={() => setParsePage((p) => p + 1)}>▶</Button>
                   </div>
-                  <div className="node__sub">未命中任何 WPL 规则 · 不流向任何输出</div>
-                </article>
+                )}
               </div>
             </section>
 
@@ -1434,6 +1612,25 @@ export default function WpMonitorPage() {
                 </div>
               </div>
               <div className="lane-scroll">
+                <article
+                  className={nodeClass(
+                    `node node--miss ${missHasData ? "node--miss-alert" : "node--miss-muted"}`,
+                    snapshot.miss.id,
+                    "miss",
+                  )}
+                  onMouseEnter={() => setHoveredNode(snapshot.miss.id)}
+                  onMouseLeave={() => setHoveredNode("")}
+                  onClick={() => void openDetail(snapshot.miss.id)}
+                >
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                    <div className="node__title" style={{ marginBottom: 0 }}>{snapshot.miss.name}</div>
+                    <div className="metric-badges" style={{ marginTop: 0 }}>
+                      <span className="metric-badge">速率 {fmtRate(snapshot.miss.metrics.log_rate_eps)}</span>
+                      <span className="metric-badge">数量 {fmtCount(snapshot.miss.metrics.log_count)}</span>
+                    </div>
+                  </div>
+                  <div className="node__sub">未命中任何 WPL 规则 · 不流向任何输出</div>
+                </article>
                 {snapshot.sinks.map((group) => {
                   const isExpanded = expandedGroups.includes(group.id);
                   const handleGroupClick = () => {

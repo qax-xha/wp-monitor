@@ -58,6 +58,21 @@ function mergeTimePoints(groups: Array<{ ts: string; value: number }[]>) {
   return merged;
 }
 
+/** 统一 POST 请求：成功返回 ApiResp<T>，失败抛出 ApiError */
+async function requestPostJson<T>(url: string, body: unknown) {
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const json = await resp.json();
+  if (!resp.ok) {
+    const err = json as ApiErrorBody;
+    throw new ApiError(err);
+  }
+  return json as ApiResp<T>;
+}
+
 async function requestNodeTimeSeriesOnce(
   nodeId: string,
   startTime: string,
@@ -80,28 +95,41 @@ export async function fetchParseTimeSeries(
   maxDataPoints?: number,
   packageName?: string,
   sinkGroup?: string,
+  nodeIds?: string[],
 ) {
   const { start: normalizedStart, end: normalizedEnd } = normalizeTimeRange(
     startTime,
     endTime,
   );
   const safeMaxDataPoints = normalizeMaxDataPoints(maxDataPoints);
-  const params = new URLSearchParams({
+  const body: Record<string, unknown> = {
     scope,
     start_time: normalizedStart,
     end_time: normalizedEnd,
-  });
-  if (safeMaxDataPoints) {
-    params.set("max_data_points", String(safeMaxDataPoints));
-  }
-  if (packageName) {
-    params.set("package_name", packageName);
-  }
-  if (sinkGroup) {
-    params.set("sink_group", sinkGroup);
-  }
-  const url = `/api/v1/wp-monitor/nodes/timeseries?${params.toString()}`;
-  return requestJson<NodeTimeSeries[]>(url);
+  };
+  if (safeMaxDataPoints) body.max_data_points = safeMaxDataPoints;
+  if (packageName) body.package_name = packageName;
+  if (sinkGroup) body.sink_group = sinkGroup;
+  if (nodeIds && nodeIds.length > 0) body.node_ids = nodeIds;
+  return requestPostJson<NodeTimeSeries[]>("/api/v1/wp-monitor/nodes/timeseries", body);
+}
+
+/** 获取 package 级别时序数据（按 node_ids 过滤） */
+export async function fetchPackagesTimeSeries(
+  startTime: string,
+  endTime: string,
+  maxDataPoints?: number,
+  nodeIds?: string[],
+) {
+  const { start: normalizedStart, end: normalizedEnd } = normalizeTimeRange(startTime, endTime);
+  const safeMaxDataPoints = normalizeMaxDataPoints(maxDataPoints);
+  const body: Record<string, unknown> = {
+    start_time: normalizedStart,
+    end_time: normalizedEnd,
+  };
+  if (safeMaxDataPoints) body.max_data_points = safeMaxDataPoints;
+  if (nodeIds && nodeIds.length > 0) body.node_ids = nodeIds;
+  return requestPostJson<NodeTimeSeries[]>("/api/v1/wp-monitor/packages/timeseries", body);
 }
 
 export async function fetchSnapshot(startTime?: string, endTime?: string) {
