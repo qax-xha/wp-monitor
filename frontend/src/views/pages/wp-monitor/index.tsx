@@ -1367,11 +1367,27 @@ export default function WpMonitorPage() {
 
             <section className="lane">
               <div className="lane-head">
-                <div
-                  className={`lane-title lane-title-clickable ${selectedNode === "__parse__" ? "selected" : ""}`}
-                  onClick={() => void openParseScope()}
-                >
-                  Parse
+                <div className="filter-toggle" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div
+                    className={`lane-title lane-title-clickable ${selectedNode === "__parse__" ? "selected" : ""}`}
+                    onClick={() => void openParseScope()}
+                  >
+                    Parse
+                  </div>
+                  <Button
+                    size="small"
+                    type={parseFilter === "withData" ? "primary" : "default"}
+                    onClick={() => { setParseFilter("withData"); setParsePage(1); }}
+                  >
+                    活跃
+                  </Button>
+                  <Button
+                    size="small"
+                    type={parseFilter === "noData" ? "primary" : "default"}
+                    onClick={() => { setParseFilter("noData"); setParsePage(1); }}
+                  >
+                    静默
+                  </Button>
                 </div>
                 <div className="lane-actions">
                   <Button size="small" onClick={() => setExpandedPackages(snapshot.parses.map((parseItem) => parseItem.id))}>
@@ -1439,22 +1455,6 @@ export default function WpMonitorPage() {
                     </div>
                   </div>
                 </div>
-              </div>
-              <div className="filter-toggle" style={{ display: "flex", gap: 4, marginBottom: 8 }}>
-                <Button
-                  size="small"
-                  type={parseFilter === "withData" ? "primary" : "default"}
-                  onClick={() => { setParseFilter("withData"); setParsePage(1); }}
-                >
-                  活跃
-                </Button>
-                <Button
-                  size="small"
-                  type={parseFilter === "noData" ? "primary" : "default"}
-                  onClick={() => { setParseFilter("noData"); setParsePage(1); }}
-                >
-                  静默
-                </Button>
               </div>
               <div className="lane-scroll">
                 {parsePageItems.map((parseItem) => {
