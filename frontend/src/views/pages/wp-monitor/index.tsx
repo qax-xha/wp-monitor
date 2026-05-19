@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  App, Button, DatePicker, Divider, Input, InputNumber, Space, Switch, Typography,
+  App, Button, DatePicker, Divider, Input, InputNumber, Space, Spin, Switch, Typography,
 } from "antd";
 import { ChevronDown } from "lucide-react";
 import dayjs, { type Dayjs } from "dayjs";
@@ -121,16 +121,6 @@ function formatLocalDateTime(iso: string) {
   });
 }
 
-function formatLocalTime(iso: string) {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
-  return date.toLocaleTimeString("zh-CN", {
-    hour12: false,
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
 function normalizeNodePillText(name: string) {
   if (name === "__source__") return "来源层";
   if (name === "__parse__") return "Parse 层";
@@ -223,7 +213,6 @@ export default function WpMonitorPage() {
   );
   const [scopeSeriesRequest, setScopeSeriesRequest] =
     useState<ScopeSeriesRequest | null>(null);
-  const [parseSeriesTitle, setParseSeriesTitle] = useState("");
   const [detailStartTime, setDetailStartTime] = useState("");
   const [detailEndTime, setDetailEndTime] = useState("");
   const [drawerLoading, setDrawerLoading] = useState(false);
@@ -275,6 +264,7 @@ export default function WpMonitorPage() {
   );
   const scopeSeriesColorMapRef = useRef<Map<string, string>>(new Map());
   const scopeSeriesColorCursorRef = useRef(0);
+  const detailRequestSeqRef = useRef(0);
 
   const clampDetailPanelHeight = useCallback((h: number) => {
     const isMobile = window.innerWidth <= 768;
@@ -391,21 +381,10 @@ export default function WpMonitorPage() {
     function onDocClick(event: MouseEvent) {
       const target = event.target as Node;
       if (!parseSearchRef.current?.contains(target)) setParseSearchOpen(false);
-      if (
-        selectedNode &&
-        !detailPanelRef.current?.contains(target) &&
-        !(target as Element).closest(
-          ".node, .node__leaf, .lane-title, .parse-search-item, .filter-toggle",
-        )
-      ) {
-        setSelectedNode("");
-        setDetailNodePill("");
-        setScopeSeriesRequest(null);
-      }
     }
     document.addEventListener("click", onDocClick);
     return () => document.removeEventListener("click", onDocClick);
-  }, [selectedNode]);
+  }, []);
 
   useEffect(() => {
     if (!sweepNode) return;
@@ -876,6 +855,7 @@ export default function WpMonitorPage() {
   }
 
   async function openDetail(nodeId: string) {
+    const seq = ++detailRequestSeqRef.current;
     setDetailViewMode("node");
     setDetailNodePill(resolveNodePillById(nodeId));
     setHiddenScopeSeriesNames([]);
@@ -888,10 +868,6 @@ export default function WpMonitorPage() {
     setDetailEndTime(detailRange.end);
     setDrawerLoading(true);
     setDrawerError("");
-    setDetail(null);
-    setSeries(null);
-    setParseSeriesList(null);
-    setParseSeriesTitle("");
     setMissLogs([]);
     setMissHasMore(false);
     setMissLogsError("");
@@ -919,6 +895,7 @@ export default function WpMonitorPage() {
           seriesPromise,
           fetchMissedLogs(detailRange.start, detailRange.end, 1, MISS_PAGE_SIZE),
         ]);
+        if (detailRequestSeqRef.current !== seq) return;
         setMissLogs(missedResp.items);
         setMissHasMore(missedResp.has_more ?? false);
         setMissPage(missedResp.page ?? 1);
@@ -934,6 +911,7 @@ export default function WpMonitorPage() {
         detailPromise,
         seriesPromise,
       ]);
+      if (detailRequestSeqRef.current !== seq) return;
       setDetail(detailResp.data);
       setDetailNodePill(normalizeNodePillText(detailResp.data.name));
       setSeries(seriesResp.data);
@@ -956,6 +934,7 @@ export default function WpMonitorPage() {
     packageName?: string,
     sinkGroup?: string,
   ) {
+    const seq = ++detailRequestSeqRef.current;
     scopeModeRef.current = "log";
     setDetailViewMode("scope");
     setDetailNodePill(normalizeNodePillText(title.replace(/ 节点趋势$/, "")));
@@ -967,10 +946,6 @@ export default function WpMonitorPage() {
     setDetailEndTime(range.end);
     setDrawerLoading(true);
     setDrawerError("");
-    setDetail(null);
-    setSeries(null);
-    setParseSeriesList(null);
-    setParseSeriesTitle(title);
     try {
       // 按活跃/静默收集应查询的 log node_ids
       let logNodeIds: string[] | undefined;
@@ -990,6 +965,7 @@ export default function WpMonitorPage() {
         sinkGroup,
         logNodeIds,
       );
+      if (detailRequestSeqRef.current !== seq) return;
       setParseSeriesList(timeseriesResp.data ?? []);
     } catch (err) {
       setDrawerError((err as Error).message || "Parse 时间序列获取失败");
@@ -999,6 +975,7 @@ export default function WpMonitorPage() {
   }
 
   async function openParseScope() {
+    const seq = ++detailRequestSeqRef.current;
     scopeModeRef.current = "package";
     const title = parseFilter === "withData" ? "Parse 层 Package 趋势（活跃）" : "Parse 层 Package 趋势（静默）";
     setDetailViewMode("scope");
@@ -1011,12 +988,9 @@ export default function WpMonitorPage() {
     setDetailEndTime(range.end);
     setDrawerLoading(true);
     setDrawerError("");
-    setDetail(null);
-    setSeries(null);
-    setParseSeriesList(null);
-    setParseSeriesTitle(title);
     try {
       if (filteredParses.length === 0) {
+        if (detailRequestSeqRef.current !== seq) return;
         setParseSeriesList([]);
       } else {
         const pkgFilters = filteredParses.map((pkg) => ({
@@ -1027,6 +1001,7 @@ export default function WpMonitorPage() {
           range.start, range.end, estimateMaxDataPoints(),
           pkgFilters,
         );
+        if (detailRequestSeqRef.current !== seq) return;
         setParseSeriesList(timeseriesResp.data ?? []);
       }
     } catch (err) {
@@ -1484,7 +1459,7 @@ export default function WpMonitorPage() {
                     >
                       <div className="node__header">
                         <div
-                          style={{ cursor: "pointer", flex: 1 }}
+                          className="node__parse-row"
                           onClick={(e) => {
                             e.stopPropagation();
                             void openParseTimeseries(
@@ -1498,11 +1473,11 @@ export default function WpMonitorPage() {
                           <div className="node__title">
                             {parseItem.package_name}
                           </div>
-                          <div className="node__summary">
+                          <Typography.Text className="node__summary" type="secondary">
                             {fmtRate(parseItem.metrics.log_rate_eps)} /{" "}
                             {fmtCount(parseItem.metrics.log_count)} (汇总) ·{" "}
                             {showLogs.length} 个日志类型
-                          </div>
+                          </Typography.Text>
                         </div>
                         <Button
                           size="small"
@@ -1634,11 +1609,11 @@ export default function WpMonitorPage() {
                           <div className="node__title">
                             {group.sink_group}
                           </div>
-                          <div className="node__summary">
+                          <Typography.Text className="node__summary" type="secondary">
                             {fmtRate(group.metrics.log_rate_eps)} /{" "}
                             {fmtCount(group.metrics.log_count)} · {group.sinks.length}{" "}
                             个输出目标
-                          </div>
+                          </Typography.Text>
                         </div>
                         <Button
                           size="small"
@@ -1710,14 +1685,65 @@ export default function WpMonitorPage() {
                 {detailNodePill}
               </span>
             )}
+            {detailViewMode === "node" && detail && (
+              <>
+                <span className="detail-type-badge">{detail.node_type}</span>
+                <span className="detail-head-meta">
+                  <span className="detail-head-meta-label">速率</span>
+                  <span className="detail-head-meta-value">{fmtRate(detail.metrics.log_rate_eps)}</span>
+                </span>
+                <span className="detail-head-meta">
+                  <span className="detail-head-meta-label">数量</span>
+                  <span className="detail-head-meta-value">{fmtCount(detail.metrics.log_count)}</span>
+                </span>
+                {series && (
+                  <>
+                    <Divider orientation="vertical" style={{ margin: "0 2px", borderColor: "rgba(228,77,38,0.18)" }} />
+                    <span className="detail-head-meta">
+                      <span className="detail-head-meta-label">采样间隔</span>
+                      <span className="detail-head-meta-value">{series.step_secs}s</span>
+                    </span>
+                    <span className="detail-head-meta">
+                      <span className="detail-head-meta-label">统计窗口</span>
+                      <span className="detail-head-meta-value">{series.rate_window_secs}s</span>
+                    </span>
+                  </>
+                )}
+              </>
+            )}
+            {detailViewMode === "node" && !detail && series && (
+              <>
+                <Divider orientation="vertical" style={{ margin: "0 2px", borderColor: "rgba(228,77,38,0.18)" }} />
+                <span className="detail-head-meta">
+                  <span className="detail-head-meta-label">采样间隔</span>
+                  <span className="detail-head-meta-value">{series.step_secs}s</span>
+                </span>
+                <span className="detail-head-meta">
+                  <span className="detail-head-meta-label">统计窗口</span>
+                  <span className="detail-head-meta-value">{series.rate_window_secs}s</span>
+                </span>
+              </>
+            )}
+            {drawerLoading && (
+              <Typography.Text type="secondary" style={{ fontSize: 11 }}>加载中…</Typography.Text>
+            )}
           </div>
           <div className="detail-panel-head-right">
+            {(detail || parseSeriesList) && (
+              <Space>
+                <Typography.Text type="secondary" style={{ fontSize: 12 }}>实时刷新</Typography.Text>
+                <Switch
+                  size="small"
+                  checked={detailTrendAutoRefresh}
+                  onChange={setDetailTrendAutoRefresh}
+                />
+              </Space>
+            )}
             <button
               className="drawer-close"
               onClick={() => {
                 setSelectedNode("");
                 setParseSeriesList(null);
-                setParseSeriesTitle("");
                 setDetailNodePill("");
                 setHiddenScopeSeriesNames([]);
                 setScopeSeriesRequest(null);
@@ -1730,28 +1756,20 @@ export default function WpMonitorPage() {
         </div>
 
         <div className="detail-panel-body">
-          {drawerLoading && <p>详情加载中...</p>}
-          {!drawerLoading && drawerError && (
+          {drawerError && (
             <p className="error">错误: {drawerError}</p>
           )}
-          {!drawerLoading &&
-            !drawerError &&
+          {!drawerError &&
             detailViewMode === "scope" &&
             parseSeriesList && (
               <ScopeTrendPanel
-                title={parseSeriesTitle}
-                parseSeriesList={parseSeriesList}
+                loading={drawerLoading}
                 parseMultiSeries={parseMultiSeries}
                 visibleParseMultiSeries={visibleParseMultiSeries}
                 hiddenScopeSeriesNames={hiddenScopeSeriesNames}
-                detailTrendAutoRefresh={detailTrendAutoRefresh}
                 detailStartTime={detailStartTime}
                 detailEndTime={detailEndTime}
                 accentColor={accentColor}
-                onToggleAutoRefresh={() =>
-                  setDetailTrendAutoRefresh((prev) => !prev)
-                }
-
                 onToggleSeries={(name) =>
                   setHiddenScopeSeriesNames((prev) =>
                     prev.includes(name)
@@ -1760,11 +1778,9 @@ export default function WpMonitorPage() {
                   )
                 }
                 formatRate2={formatRate2}
-                formatLocalTime={formatLocalTime}
               />
             )}
-          {!drawerLoading &&
-            !drawerError &&
+          {!drawerError &&
             detailViewMode === "node" &&
             detail && (
               <div className={`detail-grid ${isMissSelected ? "miss-mode" : ""}`}>
@@ -1802,35 +1818,10 @@ export default function WpMonitorPage() {
                 </section>
 
                 {!isMissSelected && (
-                  <section className="panel card detail-col">
-                    <div className="panel-head">
-                      <div className="panel-head-main">
-                        <Typography.Text strong style={{ fontSize: 13, color: "var(--text-sub)" }}>速率趋势</Typography.Text>
-                        <Divider orientation="vertical" style={{ margin: "0 2px", borderColor: "rgba(228,77,38,0.18)" }} />
-                        <Space size={4}>
-                          <Typography.Text type="secondary" style={{ fontSize: 11 }}>采样间隔</Typography.Text>
-                          <Typography.Text style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-sub)" }}>
-                            {series?.step_secs ?? 0}s
-                          </Typography.Text>
-                        </Space>
-                        <Space size={4}>
-                          <Typography.Text type="secondary" style={{ fontSize: 11 }}>统计窗口</Typography.Text>
-                          <Typography.Text style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-sub)" }}>
-                            {series?.rate_window_secs ?? 0}s
-                          </Typography.Text>
-                        </Space>
-                      </div>
-                      <Space>
-                        <Typography.Text type="secondary" style={{ fontSize: 12 }}>实时刷新</Typography.Text>
-                        <Switch
-                          size="small"
-                          checked={detailTrendAutoRefresh}
-                          onChange={setDetailTrendAutoRefresh}
-                        />
-                      </Space>
-                    </div>
-                    <TimeSeriesChart
-                      title="速率趋势"
+                  <section className="detail-col">
+                    <Spin spinning={drawerLoading}>
+                      <TimeSeriesChart
+                        title="速率趋势"
                       points={rateChartPoints}
                       color={accentColor}
                       showTitleValue={false}
@@ -1838,15 +1829,13 @@ export default function WpMonitorPage() {
                       axisValueFormatter={formatRate2}
                       minY={0}
                       yTickAmount={6}
-                      rangeStartLabel={formatLocalTime(detailStartTime)}
-                      rangeEndLabel={formatLocalTime(detailEndTime)}
-                      showRangeMeta={false}
                     />
+                    </Spin>
                   </section>
                 )}
 
                 {isMissSelected && (
-                  <section className="panel card detail-col detail-miss-col">
+                  <section className="detail-col detail-miss-col">
                     <div className="panel-title">MISS 原始日志</div>
                     <div className="miss-query-toolbar">
                       <Button
@@ -1916,7 +1905,7 @@ export default function WpMonitorPage() {
                       )}
                   </section>
                 )}
-              </div>
+              </>
             )}
 
           {!drawerLoading &&

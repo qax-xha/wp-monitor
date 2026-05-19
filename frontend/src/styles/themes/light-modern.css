@@ -106,9 +106,6 @@
 [data-theme="light-modern"] .detail-panel-head {
   border-bottom: 1px solid rgba(0, 0, 0, 0.1);
 }
-[data-theme="light-modern"] .detail-grid .panel.card {
-  border-color: rgba(0, 0, 0, 0.1);
-}
 [data-theme="light-modern"] .detail-node-pill--package {
   border-color: rgba(0, 0, 0, 0.1);
   background: rgba(0, 0, 0, 0.04);
@@ -118,7 +115,7 @@
 /* 选中态 */
 [data-theme="light-modern"] .node.selected {
   border-color: rgba(0, 0, 0, 0.15);
-  border-width: 2px;
+  border-width: 1px;
   background: #ffffff;
   box-shadow: 0 0 4px rgba(0, 0, 0, 0.06), inset 0 0 4px rgba(0, 0, 0, 0.02);
 }
@@ -129,7 +126,7 @@
 [data-theme="light-modern"] .node--package:has(.node__leaf.selected),
 [data-theme="light-modern"] .node--group:has(.node__leaf.selected) {
   border-color: rgba(0, 0, 0, 0.15);
-  border-width: 2px;
+  border-width: 1px;
   background: #ffffff;
   box-shadow: 0 0 4px rgba(0, 0, 0, 0.06), inset 0 0 4px rgba(0, 0, 0, 0.02);
 }
@@ -151,7 +148,7 @@
 }
 [data-theme="light-modern"] .node__leaf.selected {
   border-color: rgba(0, 0, 0, 0.075);
-  border-width: 2px;
+  border-width: 1px;
   box-shadow: 0 0 4px rgba(0, 0, 0, 0.06), inset 0 0 4px rgba(0, 0, 0, 0.02);
   background: rgba(0, 0, 0, 0.065);
 }

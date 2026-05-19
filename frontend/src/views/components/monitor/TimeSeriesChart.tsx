@@ -14,15 +14,12 @@ interface Props {
   axisValueFormatter?: (v: number) => string;
   minY?: number;
   yTickAmount?: number;
-  rangeStartLabel?: string;
-  rangeEndLabel?: string;
-  showRangeMeta?: boolean;
 }
 
-function timeText(ts: string) {
-  const date = new Date(ts);
-  if (Number.isNaN(date.getTime())) return ts;
-  return date.toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit' });
+function removeApexNativeSvgTitles(root: HTMLDivElement | null) {
+  root?.querySelectorAll('.apexcharts-svg > title').forEach((titleEl) => {
+    titleEl.remove();
+  });
 }
 
 export default function TimeSeriesChart({
@@ -35,9 +32,6 @@ export default function TimeSeriesChart({
   axisValueFormatter,
   minY,
   yTickAmount = 6,
-  rangeStartLabel,
-  rangeEndLabel,
-  showRangeMeta = true,
 }: Props) {
   const isMulti = Boolean(multiSeries && multiSeries.length > 0);
   const flatPoints = isMulti
@@ -199,7 +193,7 @@ export default function TimeSeriesChart({
     if (!chartRef.current) return;
     const chart = new ApexCharts(chartRef.current, { ...options, series });
     instanceRef.current = chart;
-    void chart.render();
+    void chart.render().then(() => removeApexNativeSvgTitles(chartRef.current));
 
     return () => {
       instanceRef.current?.destroy();
@@ -232,18 +226,12 @@ export default function TimeSeriesChart({
       false,
       false,
       false,
-    );
+    ).then(() => removeApexNativeSvgTitles(chartRef.current));
   }, [options, series]);
 
   return (
     <div className="spark">
       <div ref={chartRef} className="spark-chart" />
-      {showRangeMeta && (
-        <div className="spark-meta">
-          <span>{rangeStartLabel ?? (points[0] ? timeText(points[0].ts) : '-')}</span>
-          <span>{rangeEndLabel ?? (points[points.length - 1] ? timeText(points[points.length - 1].ts) : '-')}</span>
-        </div>
-      )}
     </div>
   );
 }
