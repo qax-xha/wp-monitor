@@ -3,6 +3,23 @@
 All notable changes are documented in this file, following [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 with version numbers adhering to [Semantic Versioning](https://semver.org/).
 
+## [0.7.3] - 2026-05-19
+
+### Added
+
+- Add file-based reading mode for MISS logs with increased file reading channels for better performance in large-file log replay scenarios.
+
+### Changed
+
+- Compact frontend layout with reduced spacing for higher information density.
+- Align parse layer node list horizontally, fixing visual misalignment with side panels.
+
+### Fixed
+
+- Remove chart title and update tooltip style for rate trend chart.
+- Update chart tooltip border style.
+- Fix TypeScript compilation warnings (unused variables, JSX tag mismatch causing build failure).
+
 ## [0.7.2] - 2026-05-15
 
 ### Added

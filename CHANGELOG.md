@@ -6,6 +6,32 @@
 All notable changes are documented in this file, following [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 with version numbers adhering to [Semantic Versioning](https://semver.org/).
 
+## [0.7.3] - 2026-05-19
+
+### Added
+
+- MISS 日志新增文件读取模式，支持大文件场景下的日志回放，增加文件读取通道以提升性能。
+
+- Add file-based reading mode for MISS logs with increased file reading channels for better performance in large-file log replay scenarios.
+
+### Changed
+
+- 前端布局紧凑化，缩减各区域间距，提升信息密度。
+- Parse 层节点列表横向对齐，修复与两侧面板不对齐的视觉问题。
+
+- Compact frontend layout with reduced spacing for higher information density.
+- Align parse layer node list horizontally, fixing visual misalignment with side panels.
+
+### Fixed
+
+- 移除速率趋势图标题并优化 tooltip 样式。
+- 更新图表 tooltip 边框样式。
+- 修复 TypeScript 编译警告（未使用变量、JSX 标签不匹配导致构建失败）。
+
+- Remove chart title and update tooltip style for rate trend chart.
+- Update chart tooltip border style.
+- Fix TypeScript compilation warnings (unused variables, JSX tag mismatch causing build failure).
+
 ## [0.7.2] - 2026-05-15
 
 ### Added
