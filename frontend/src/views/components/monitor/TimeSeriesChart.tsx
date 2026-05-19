@@ -95,6 +95,7 @@ export default function TimeSeriesChart({
       chart: {
         type: 'line',
         height: '100%',
+        parentHeightOffset: 0,
         toolbar: { show: false },
         zoom: { enabled: false },
         animations: { enabled: true, speed: 320 },
@@ -114,7 +115,7 @@ export default function TimeSeriesChart({
       grid: {
         borderColor: '#d2ddf0',
         strokeDashArray: 4,
-        padding: { left: 16, right: 10, top: 4, bottom: 8 },
+        padding: { left: 16, right: 10, top: -12, bottom: 2 },
       },
       xaxis: {
         type: 'datetime',
