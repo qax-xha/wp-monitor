@@ -9,6 +9,17 @@
   --accent-glow: rgba(228, 77, 38, 0.2);
   --accent-soft: rgba(228, 77, 38, 0.07);
   --border-subtle: rgba(228, 77, 38, 0.08);
+  --chart-border: rgba(228, 77, 38, 0.75);
+  --chart-gridline: rgba(255, 181, 115, 0.11);
+  --chart-axis-line: rgba(255, 181, 115, 0.3);
+  --chart-panel-shadow:
+    inset 0 0 0 1px rgba(255, 236, 214, 0.04),
+    0 10px 30px rgba(0, 0, 0, 0.24);
+  --chart-tooltip-border: rgba(228, 77, 38, 0.75);
+  --chart-tooltip-shadow:
+    0 0 0 1px rgba(255, 236, 214, 0.08),
+    0 12px 30px rgba(0, 0, 0, 0.58),
+    0 0 18px rgba(228, 77, 38, 0.22);
   --detail-heading-color: #fcd9c6;
   --miss-border-style: dashed;
   --close-hover-bg: rgba(224, 72, 72, 0.2);
