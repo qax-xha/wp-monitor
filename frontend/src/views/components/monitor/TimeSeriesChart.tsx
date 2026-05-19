@@ -16,6 +16,12 @@ interface Props {
   yTickAmount?: number;
 }
 
+function removeApexNativeSvgTitles(root: HTMLDivElement | null) {
+  root?.querySelectorAll('.apexcharts-svg > title').forEach((titleEl) => {
+    titleEl.remove();
+  });
+}
+
 export default function TimeSeriesChart({
   title,
   points,
@@ -187,7 +193,7 @@ export default function TimeSeriesChart({
     if (!chartRef.current) return;
     const chart = new ApexCharts(chartRef.current, { ...options, series });
     instanceRef.current = chart;
-    void chart.render();
+    void chart.render().then(() => removeApexNativeSvgTitles(chartRef.current));
 
     return () => {
       instanceRef.current?.destroy();
@@ -220,7 +226,7 @@ export default function TimeSeriesChart({
       false,
       false,
       false,
-    );
+    ).then(() => removeApexNativeSvgTitles(chartRef.current));
   }, [options, series]);
 
   return (

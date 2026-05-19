@@ -860,20 +860,45 @@ body::before {
   font-size: 11px !important;
   padding: 6px 10px !important;
 }
-.apexcharts-tooltip .apexcharts-tooltip-series-group { padding: 4px 10px !important; }
+.apexcharts-tooltip .apexcharts-tooltip-series-group {
+  line-height: 16px !important;
+  min-height: 0 !important;
+  padding: 1px 10px !important;
+}
+.apexcharts-tooltip .apexcharts-tooltip-y-group {
+  line-height: 16px !important;
+  padding: 1px 0 !important;
+}
 .apexcharts-tooltip .apexcharts-tooltip-text-y-label,
 .apexcharts-tooltip .apexcharts-tooltip-text-y-value {
   color: var(--text-main) !important;
   font-family: var(--font-mono) !important;
   font-size: 12px !important;
+  line-height: 16px !important;
 }
 .apexcharts-tooltip .apexcharts-tooltip-text-goals-value,
 .apexcharts-tooltip .apexcharts-tooltip-text-z-value { color: var(--text-sub) !important; }
 .apexcharts-tooltip .apexcharts-tooltip-marker {
+  align-items: center !important;
+  display: inline-flex !important;
+  flex: 0 0 10px !important;
+  justify-content: center !important;
   width: 10px !important;
-  height: 10px !important;
-  border-radius: 50% !important;
+  height: 16px !important;
+  line-height: 16px !important;
   margin-right: 6px !important;
+  vertical-align: middle !important;
+}
+.apexcharts-tooltip .apexcharts-tooltip-marker::before {
+  background: currentColor !important;
+  border-radius: 50% !important;
+  content: "" !important;
+  display: block !important;
+  font-size: 0 !important;
+  height: 8px !important;
+  line-height: 1 !important;
+  transform: none !important;
+  width: 8px !important;
 }
 /* detail-col 内图表撑满剩余空间 */
 .detail-col .spark {
