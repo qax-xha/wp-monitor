@@ -100,30 +100,3 @@ fn last_records(data: &[u8], limit: usize) -> VecDeque<&[u8]> {
 
     records
 }
-
-#[cfg(test)]
-mod tests {
-    use std::time::Instant;
-
-use super::*;
-
-    #[test]
-    fn test_file_repository() {
-        let repo =
-            FileRepository::new("/Users/tangxiangyan/Downloads/release/data/out_dat/miss.dat")
-                .expect("Failed to create FileRepository");
-        let content = repo.tail_records(10).expect("Failed to read file");
-        println!("File content: {:#?}", content);
-    }
-
-    #[test]
-    fn test_count_records() {
-        let repo =
-            FileRepository::new("/Users/tangxiangyan/Downloads/release/data/out_dat/miss.dat")
-                .expect("Failed to create FileRepository");
-        let instance = Instant::now();
-        let count = repo.count_records().expect("Failed to count records");
-        println!("Record count: {}", count);
-        println!("Time taken: {:?}", instance.elapsed());
-    }
-}
