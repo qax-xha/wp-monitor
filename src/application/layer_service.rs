@@ -1,9 +1,9 @@
+use crate::domain::miss_repository::MissRepository;
 use crate::domain::model::{
     LayerSnapshot, LayerVersions, LayersMetricsResponse, MetricsSnapshot, MissNode, NodeDetail,
     NodeMetricsItem, NodeTimeSeries, SnapshotMeta, TimeRangeQuery,
 };
-use crate::infrastructure::vm_repository::{VmRepository, VmSnapshotData};
-use crate::interfaces::vm::handlers::PackageFilter;
+use crate::domain::vm_repository::{PackageFilter, VmRepository, VmSnapshotData};
 use crate::shared::config::AppConfig;
 use crate::shared::error::AppError;
 use crate::shared::hash::stable_hash_json;
@@ -270,15 +270,21 @@ impl LayerNodeCache {
 /// - 不直接关心 HTTP/PromQL 细节。
 pub struct LayerService {
     vm_repo: Arc<dyn VmRepository>,
+    miss_repo: Arc<dyn MissRepository>,
     config: AppConfig,
     node_cache: RwLock<LayerNodeCache>,
 }
 
 impl LayerService {
     /// 通过依赖注入方式接入 VM 仓储抽象，便于后续替换实现/测试。
-    pub fn new(vm_repo: Arc<dyn VmRepository>, config: AppConfig) -> Self {
+    pub fn new(
+        vm_repo: Arc<dyn VmRepository>,
+        miss_repo: Arc<dyn MissRepository>,
+        config: AppConfig,
+    ) -> Self {
         Self {
             vm_repo,
+            miss_repo,
             config,
             node_cache: RwLock::new(LayerNodeCache::default()),
         }
@@ -328,14 +334,18 @@ impl LayerService {
             end_time: query.end_time.to_rfc3339(),
         };
 
-        // MISS 节点指标改为走 VM 实时查询（速率 + 时间窗口累计数量）。
-        let miss_metrics = self.vm_repo.fetch_miss_metrics(&query).await?;
+        // MISS 节点总量走 MissRepository（VictoriaLogs），不走 VictoriaMetrics。
+        let miss_count = self.miss_repo.count_total().await?;
+        let miss_metrics = MetricsSnapshot {
+            log_rate_eps: 0.0,
+            log_count: miss_count,
+            collected_at: Utc::now().to_rfc3339(),
+        };
         debug!(
             source_count = snapshot_data.sources.len(),
             parse_count = snapshot_data.parses.len(),
             sink_group_count = snapshot_data.sinks.len(),
-            miss_rate_eps = miss_metrics.log_rate_eps,
-            miss_count = miss_metrics.log_count,
+            miss_count = miss_count,
             "layer_service.layers_snapshot.success"
         );
 
@@ -494,14 +504,18 @@ impl LayerService {
         }
 
         if node_id == "miss" {
-            let miss_metrics = self.vm_repo.fetch_miss_metrics(&query).await?;
+            let miss_count = self.miss_repo.count_total().await?;
             debug!(node_id = %node_id, "layer_service.node_detail.miss");
             return Ok(NodeDetail {
                 id: "miss".to_string(),
                 name: "MISS".to_string(),
                 node_type: "miss".to_string(),
                 package_name: None,
-                metrics: miss_metrics,
+                metrics: MetricsSnapshot {
+                    log_rate_eps: 0.0,
+                    log_count: miss_count,
+                    collected_at: Utc::now().to_rfc3339(),
+                },
             });
         }
 
@@ -554,21 +568,15 @@ impl LayerService {
         max_data_points: Option<usize>,
         filters: Vec<PackageFilter>,
     ) -> Result<Vec<NodeTimeSeries>, AppError> {
-        // 每个 filter 构建 (package_regex, rule_regex) 对，保留 package-rule 关联
+        // 传递原始值，PromQL 转义由基础设施层负责。
         let pairs: Vec<(String, String)> = filters
             .iter()
             .filter_map(|f| {
                 if f.rule_names.is_empty() {
                     return None;
                 }
-                let pkg_regex = escape_regex_chars(&f.package_name);
-                let rule_regex = f
-                    .rule_names
-                    .iter()
-                    .map(|r| escape_regex_chars(r))
-                    .collect::<Vec<_>>()
-                    .join("|");
-                Some((pkg_regex, rule_regex))
+                let rule_regex = f.rule_names.join("|");
+                Some((f.package_name.clone(), rule_regex))
             })
             .collect();
 
@@ -592,17 +600,9 @@ impl LayerService {
         rule_name: Vec<String>,
         max_data_points: Option<usize>,
     ) -> Result<Vec<NodeTimeSeries>, AppError> {
-        let package_name = package_name
-            .iter()
-            .map(|id| escape_regex_chars(id))
-            .collect::<Vec<_>>()
-            .join("|");
-
-        let rule_name = rule_name
-            .iter()
-            .map(|id| escape_regex_chars(id))
-            .collect::<Vec<_>>()
-            .join("|");
+        // 传递原始值，PromQL 转义由基础设施层负责。
+        let package_name = package_name.join("|");
+        let rule_name = rule_name.join("|");
         let timeseries = self
             .vm_repo
             .fetch_parse_timeseries(&query, &package_name, &rule_name, max_data_points)
@@ -639,18 +639,4 @@ impl LayerService {
           "vm_base_url": self.config.vm_base_url
         })
     }
-}
-
-pub fn escape_regex_chars(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    for ch in s.chars() {
-        match ch {
-            '\\' | '.' | '+' | '*' | '?' | '^' | '$' | '(' | ')' | '[' | ']' | '{' | '}' | '|' => {
-                out.push('\\');
-                out.push(ch);
-            }
-            _ => out.push(ch),
-        }
-    }
-    out
 }

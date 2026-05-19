@@ -13,15 +13,18 @@ pub struct AppConfig {
     #[serde(default = "default_log_level")]
     pub log_level: String,
 
-    pub vlog_base_url: String,
+    pub vlog_base_url: Option<String>,
+
+    pub miss_file_path: Option<String>,
 }
 
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
             vm_base_url: "http://127.0.0.1:8428".to_string(),
-            vlog_base_url: "http://127.0.0.1:9428".to_string(),
+            vlog_base_url: Some("http://127.0.0.1:9428".to_string()),
             log_level: default_log_level(),
+            miss_file_path: None,
         }
     }
 }

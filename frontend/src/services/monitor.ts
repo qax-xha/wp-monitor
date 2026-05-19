@@ -271,7 +271,21 @@ export async function fetchMissedLogs(
   const safePageSize = Math.max(1, Math.min(100, Math.floor(pageSize || 10)));
   const url = `/api/v1/wp-monitor/vlog/missed?query=${encodeURIComponent("wp_stage:miss")}&start=${encodeURIComponent(normalizedStart)}&end=${encodeURIComponent(normalizedEnd)}&page=${safePage}&page_size=${safePageSize}`;
   const data = await requestJson<MissedLogsPage>(url);
-  return data.data;
+  const body = data.data;
+  // 文件模式响应无分页字段，统一补默认值。
+  if (body.source === "file") {
+    return {
+      source: "file" as const,
+      items: body.items,
+      page: 1,
+      page_size: body.items.length,
+      has_more: false,
+      start: normalizedStart,
+      end: normalizedEnd,
+      query: "",
+    };
+  }
+  return body;
 }
 
 export async function exportMissedLogs(startTime: string, endTime: string) {

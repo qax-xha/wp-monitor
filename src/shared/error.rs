@@ -26,6 +26,9 @@ pub enum AppReason {
     #[orion_error(identity = "sys.vlog_response_invalid")]
     VlogResponseInvalid,
 
+    #[orion_error(identity = "sys.file_read_failed")]
+    FileReadFailed,
+
     #[orion_error(transparent)]
     General(UnifiedReason),
 }

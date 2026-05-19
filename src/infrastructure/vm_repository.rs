@@ -1,9 +1,8 @@
-use crate::application::layer_service::escape_regex_chars;
 use crate::domain::model::{
     LogTypeNode, MetricsSnapshot, NodeTimeSeries, ParseNode, SinkGroupNode, SinkLeafNode,
     SourceNode, SysMetrics, TimePoint, TimeRangeQuery,
 };
-use crate::interfaces::vm::handlers::PackageFilter;
+use crate::domain::vm_repository::{PackageFilter, VmRepository, VmSnapshotData};
 use crate::shared::error::{AppError, AppReason};
 use async_trait::async_trait;
 use chrono::Utc;
@@ -13,57 +12,27 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use tracing::{debug, warn};
 
-/// 从 VM 查询后，应用层所需的基础快照原始数据。
-#[derive(Debug, Clone)]
-pub struct VmSnapshotData {
-    pub sources: Vec<SourceNode>,
-    pub parses: Vec<ParseNode>,
-    pub sinks: Vec<SinkGroupNode>,
-    pub sys_metrics: SysMetrics,
+/// 转义 PromQL 正则特殊字符。
+fn escape_regex_chars(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for ch in s.chars() {
+        match ch {
+            '\\' | '.' | '+' | '*' | '?' | '^' | '$' | '(' | ')' | '[' | ']' | '{' | '}' | '|' => {
+                out.push('\\');
+                out.push(ch);
+            }
+            _ => out.push(ch),
+        }
+    }
+    out
 }
 
-/// VM 仓储抽象：
-/// - fetch_snapshot_data：查一次“当前时刻”聚合快照；
-/// - fetch_node_timeseries：按节点拉区间序列。
-#[async_trait]
-pub trait VmRepository: Send + Sync {
-    async fn fetch_snapshot_data(
-        &self,
-        query: &TimeRangeQuery,
-        filters: Option<Vec<PackageFilter>>,
-    ) -> Result<VmSnapshotData, AppError>;
-    async fn fetch_miss_metrics(&self, query: &TimeRangeQuery)
-    -> Result<MetricsSnapshot, AppError>;
-    async fn fetch_node_timeseries(
-        &self,
-        node_id: &str,
-        query: &TimeRangeQuery,
-        max_data_points: Option<usize>,
-    ) -> Result<NodeTimeSeries, AppError>;
-    async fn fetch_parse_timeseries(
-        &self,
-        query: &TimeRangeQuery,
-        package_name: &str,
-        rule_names: &str,
-        max_data_points: Option<usize>,
-    ) -> Result<Vec<NodeTimeSeries>, AppError>;
-    async fn fetch_packages_timeseries(
-        &self,
-        query: &TimeRangeQuery,
-        filters: &[(String, String)],
-        max_data_points: Option<usize>,
-    ) -> Result<Vec<NodeTimeSeries>, AppError>;
-    async fn fetch_source_timeseries(
-        &self,
-        query: &TimeRangeQuery,
-        max_data_points: Option<usize>,
-    ) -> Result<Vec<NodeTimeSeries>, AppError>;
-    async fn fetch_sink_timeseries(
-        &self,
-        query: &TimeRangeQuery,
-        sink_group: Option<&str>,
-        max_data_points: Option<usize>,
-    ) -> Result<Vec<NodeTimeSeries>, AppError>;
+/// 将 `|` 分隔的多个名称分别转义后重新拼接为正则分支。
+fn escape_pipe_separated(s: &str) -> String {
+    s.split('|')
+        .map(escape_regex_chars)
+        .collect::<Vec<_>>()
+        .join("|")
 }
 
 /// 基于 HTTP 协议访问 VictoriaMetrics 的仓储实现。
@@ -698,44 +667,6 @@ impl VmRepository for VmHttpRepository {
         })
     }
 
-    /// 查询 MISS 指标快照（速率 + 时间窗口累计数量）。
-    /// 指标来源：
-    async fn fetch_miss_metrics(
-        &self,
-        query: &TimeRangeQuery,
-    ) -> Result<MetricsSnapshot, AppError> {
-        let at_start = query.start_time.timestamp();
-        let at_end = query.end_time.timestamp();
-        let window_secs = (at_end - at_start).max(1) as f64;
-        debug!(
-            start_time = %query.start_time,
-            end_time = %query.end_time,
-            window_secs = window_secs,
-            "vm_repository.miss_metrics.start"
-        );
-        let total_q = format!(
-            r#"sum({})"#,
-            Self::counter_increase_expr(
-                r#"wparse_send_to_sink{sink_group="miss",sink_name="victorialogs_output"}"#,
-                &format!("{}s", (at_end - at_start).max(1)),
-            )
-        );
-        let end_rows = self.instant_query(&total_q, at_end).await?;
-        let count_f = end_rows.first().map(|x| x.value).unwrap_or(0.0).max(0.0);
-        let count = count_f.round() as u64;
-        let rate = count_f / window_secs;
-        debug!(
-            rate = rate,
-            count = count,
-            "vm_repository.miss_metrics.success"
-        );
-        Ok(MetricsSnapshot {
-            log_rate_eps: rate,
-            log_count: count,
-            collected_at: Utc::now().to_rfc3339(),
-        })
-    }
-
     /// 查询单节点时间序列：
     /// 1. 根据 node_id 解析节点类型和标签；
     /// 2. 直接使用 rate() 进行区间查询，返回每秒速率；
@@ -898,15 +829,12 @@ impl VmRepository for VmHttpRepository {
         let package_selector = if package_name == ".*" {
             ".*".to_string()
         } else {
-            format!("^{}$", escape_regex_chars(package_name))
+            format!("^{}$", escape_pipe_separated(package_name))
         };
         let rule_selector = if rule_names == ".*" {
             ".*".to_string()
-        } else if rule_names.contains('|') {
-            // 已经是 | 分隔的正则表达式（来自 node_ids），直接使用
-            format!("^{}$", rule_names)
         } else {
-            format!("^{}$", escape_regex_chars(rule_names))
+            format!("^{}$", escape_pipe_separated(rule_names))
         };
         let query_prom = format!(
             r#"(sum by (package_name, rule_name) ({}))/{}"#,
@@ -956,12 +884,14 @@ impl VmRepository for VmHttpRepository {
         let subqueries: Vec<String> = filters
             .iter()
             .map(|(pkg_regex, rule_regex)| {
+                let escaped_pkg = escape_regex_chars(pkg_regex);
+                let escaped_rule = escape_pipe_separated(rule_regex);
                 format!(
                     r#"(sum by (package_name) ({}))/{}"#,
                     Self::counter_increase_expr(
                         &format!(
                             r#"wparse_parse_all{{package_name=~"^{}$",rule_name=~"^{}$"}}"#,
-                            pkg_regex, rule_regex
+                            escaped_pkg, escaped_rule
                         ),
                         &rate_window,
                     ),
