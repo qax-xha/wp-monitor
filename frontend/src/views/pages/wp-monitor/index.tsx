@@ -977,7 +977,6 @@ export default function WpMonitorPage() {
   async function openParseScope() {
     const seq = ++detailRequestSeqRef.current;
     scopeModeRef.current = "package";
-    const title = parseFilter === "withData" ? "Parse 层 Package 趋势（活跃）" : "Parse 层 Package 趋势（静默）";
     setDetailViewMode("scope");
     setDetailNodePill(normalizeNodePillText("Parse 层"));
     setHiddenScopeSeriesNames([]);
@@ -1905,7 +1904,7 @@ export default function WpMonitorPage() {
                       )}
                   </section>
                 )}
-              </>
+              </div>
             )}
 
           {!drawerLoading &&
