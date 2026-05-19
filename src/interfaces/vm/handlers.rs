@@ -1,7 +1,8 @@
-use crate::application::layer_service::LayerService;
 use crate::domain::model::TimeRangeQuery;
+use crate::domain::vm_repository::PackageFilter;
 use crate::shared::api::{ApiResponse, ReadyResponse, VersionResponse};
 use crate::shared::error::AppErrorResponse;
+use crate::state::AppState;
 use actix_web::{HttpResponse, Result, get, post, web};
 use serde::Deserialize;
 use tracing::{debug, error};
@@ -37,7 +38,7 @@ pub struct TimeSeriesRequest {
 /// 获取全量分层快照。
 #[get("/layers/snapshot")]
 pub async fn get_layers_snapshot(
-    svc: web::Data<LayerService>,
+    state: web::Data<AppState>,
     req: web::Query<TimeRangeRequest>,
 ) -> Result<HttpResponse> {
     debug!(
@@ -54,17 +55,21 @@ pub async fn get_layers_snapshot(
         );
         AppErrorResponse::from(e)
     })?;
-    let data = svc.get_layers_snapshot(query, None).await.map_err(|e| {
-        error!(error = %e, "vm.handlers.layers_snapshot.failed");
-        AppErrorResponse::from(e)
-    })?;
+    let data = state
+        .layer
+        .get_layers_snapshot(query, None)
+        .await
+        .map_err(|e| {
+            error!(error = %e, "vm.handlers.layers_snapshot.failed");
+            AppErrorResponse::from(e)
+        })?;
     Ok(HttpResponse::Ok().json(ApiResponse::ok(data)))
 }
 
 /// 获取分层指标快照（可按 node_ids 过滤）。
 #[post("/layers/metrics")]
 pub async fn get_layers_metrics(
-    svc: web::Data<LayerService>,
+    state: web::Data<AppState>,
     req: web::Json<MetricsRequest>,
 ) -> Result<HttpResponse> {
     let req = req.into_inner();
@@ -89,7 +94,8 @@ pub async fn get_layers_metrics(
             .collect::<Vec<_>>()
     });
 
-    let data = svc
+    let data = state
+        .layer
         .get_layers_metrics(query, node_ids, req.filters)
         .await
         .map_err(|e| {
@@ -102,7 +108,7 @@ pub async fn get_layers_metrics(
 /// 获取单节点详情。
 #[get("/nodes/{node_id}/detail")]
 pub async fn get_node_detail(
-    svc: web::Data<LayerService>,
+    state: web::Data<AppState>,
     path: web::Path<String>,
     req: web::Query<TimeRangeRequest>,
 ) -> Result<HttpResponse> {
@@ -123,17 +129,21 @@ pub async fn get_node_detail(
         );
         AppErrorResponse::from(e)
     })?;
-    let data = svc.get_node_detail(node_id, query).await.map_err(|e| {
-        error!(node_id = %node_id, error = %e, "vm.handlers.node_detail.failed");
-        AppErrorResponse::from(e)
-    })?;
+    let data = state
+        .layer
+        .get_node_detail(node_id, query)
+        .await
+        .map_err(|e| {
+            error!(node_id = %node_id, error = %e, "vm.handlers.node_detail.failed");
+            AppErrorResponse::from(e)
+        })?;
     Ok(HttpResponse::Ok().json(ApiResponse::ok(data)))
 }
 
 /// 获取单节点时间序列。
 #[get("/nodes/{node_id}/timeseries")]
 pub async fn get_node_timeseries(
-    svc: web::Data<LayerService>,
+    state: web::Data<AppState>,
     path: web::Path<String>,
     req: web::Query<TimeSeriesRequest>,
 ) -> Result<HttpResponse> {
@@ -155,7 +165,8 @@ pub async fn get_node_timeseries(
         );
         AppErrorResponse::from(e)
     })?;
-    let data = svc
+    let data = state
+        .layer
         .get_node_timeseries(node_id, query, req.max_data_points)
         .await
         .map_err(|e| {
@@ -192,12 +203,6 @@ pub struct NodesTimeSeriesRequest {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct PackageFilter {
-    pub package_name: String,
-    pub rule_names: Vec<String>,
-}
-
-#[derive(Debug, Deserialize)]
 pub struct PackagesTimeSeriesRequest {
     pub start_time: String,
     pub end_time: String,
@@ -207,7 +212,7 @@ pub struct PackagesTimeSeriesRequest {
 
 #[post("/packages/timeseries")]
 pub async fn get_packages_timeseries(
-    svc: web::Data<LayerService>,
+    state: web::Data<AppState>,
     req: web::Json<PackagesTimeSeriesRequest>,
 ) -> Result<HttpResponse> {
     let query = TimeRangeQuery::new(&req.start_time, &req.end_time).map_err(|e| {
@@ -220,7 +225,8 @@ pub async fn get_packages_timeseries(
         AppErrorResponse::from(e)
     })?;
     let req = req.into_inner();
-    let data = svc
+    let data = state
+        .layer
         .get_packages_timeseries(query, req.max_data_points, req.filters)
         .await
         .map_err(|e| {
@@ -235,7 +241,7 @@ pub async fn get_packages_timeseries(
 
 #[post("/nodes/timeseries")]
 pub async fn get_nodes_timeseries(
-    svc: web::Data<LayerService>,
+    state: web::Data<AppState>,
     req: web::Json<NodesTimeSeriesRequest>,
 ) -> Result<HttpResponse> {
     debug!(
@@ -255,21 +261,24 @@ pub async fn get_nodes_timeseries(
     })?;
     let scope = req.scope.as_ref().unwrap_or(&TimeSeriesScope::Parse);
     let data = match scope {
-        TimeSeriesScope::Source => svc
+        TimeSeriesScope::Source => state
+            .layer
             .get_source_timeseries(query, req.max_data_points)
             .await
             .map_err(|e| {
                 error!(error = %e, "vm.handlers.source_timeseries.failed");
                 AppErrorResponse::from(e)
             })?,
-        TimeSeriesScope::Sink => svc
+        TimeSeriesScope::Sink => state
+            .layer
             .get_sink_timeseries(query, req.sink_group.clone(), req.max_data_points)
             .await
             .map_err(|e| {
                 error!(error = %e, "vm.handlers.sink_timeseries.failed");
                 AppErrorResponse::from(e)
             })?,
-        TimeSeriesScope::Parse => svc
+        TimeSeriesScope::Parse => state
+            .layer
             .get_parse_timeseries(
                 query,
                 req.package_name.clone(),
@@ -287,9 +296,9 @@ pub async fn get_nodes_timeseries(
 
 /// 获取前端初始化配置。
 #[get("/meta/config")]
-pub async fn get_meta_config(svc: web::Data<LayerService>) -> Result<HttpResponse> {
+pub async fn get_meta_config(state: web::Data<AppState>) -> Result<HttpResponse> {
     debug!("vm.handlers.meta_config.request");
-    let data = svc.get_meta_config().await;
+    let data = state.layer.get_meta_config().await;
     Ok(HttpResponse::Ok().json(ApiResponse::ok(data)))
 }
 

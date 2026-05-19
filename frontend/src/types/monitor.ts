@@ -83,20 +83,18 @@ export interface NodeDetail {
 }
 
 export interface VlogRecord {
-  time: string;
-  stream_id: string;
-  stream: string;
-  msg: string;
-  raw: string;
+  content: string;
 }
 
 export interface MissedLogsPage {
-  start: string;
-  end: string;
-  query: string;
-  page: number;
-  page_size: number;
-  has_more: boolean;
+  source?: string;
+  total?: number;
+  start?: string;
+  end?: string;
+  query?: string;
+  page?: number;
+  page_size?: number;
+  has_more?: boolean;
   items: VlogRecord[];
 }
 

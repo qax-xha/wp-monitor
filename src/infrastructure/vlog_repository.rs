@@ -1,44 +1,11 @@
-use crate::interfaces::vlog::handlers::VlogInstantQuery;
+use crate::domain::vlog_repository::{VlogInstantQuery, VlogRecord};
 use crate::shared::error::{AppError, AppReason};
-use async_trait::async_trait;
-use chrono::Utc;
 use orion_error::{OperationContext, prelude::*};
 use reqwest::Client;
-use serde::{Deserialize, Serialize};
 use tracing::debug;
 
-/// VLOG 单条日志记录。
-///
-/// 仅解析业务必需字段：
-/// - `_time`
-/// - `_stream_id`
-/// - `_stream`
-/// - `_msg`
-/// - `raw`
-///
-/// 其余字段由 serde 默认忽略，确保接口对字段扩展兼容。
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct VlogRecord {
-    #[serde(rename = "_time")]
-    pub time: String,
-    #[serde(rename = "_stream_id")]
-    pub stream_id: String,
-    #[serde(rename = "_stream")]
-    pub stream: String,
-    #[serde(rename = "_msg")]
-    pub msg: String,
-    pub raw: String,
-}
-
-/// VLOG 仓储抽象：
-/// - instant_query：查一次“当前时刻”聚合快照；
-/// - fetch_node_timeseries：按节点拉区间序列。
-#[async_trait]
-pub trait VlogRepository: Send + Sync {
-    async fn instant_query(&self, query: VlogInstantQuery) -> Result<Vec<VlogRecord>, AppError>;
-}
-
 /// 基于 HTTP 协议访问 VLOG 的仓储实现。
+#[derive(Clone)]
 pub struct VlogHttpRepository {
     client: Client,
     base_url: String,
@@ -54,7 +21,10 @@ impl VlogHttpRepository {
     }
 
     /// 执行 instant query（单时刻查询）。
-    async fn instant_query(&self, query: &VlogInstantQuery) -> Result<Vec<VlogRecord>, AppError> {
+    pub async fn instant_query(
+        &self,
+        query: &VlogInstantQuery,
+    ) -> Result<Vec<VlogRecord>, AppError> {
         let url = format!("{}/select/logsql/query", self.base_url);
         let ctx = OperationContext::doing("log instance query")
             .with_field("url", url.clone())
@@ -98,6 +68,38 @@ impl VlogHttpRepository {
         Ok(records)
     }
 
+    /// 查询 miss 数据总量。
+    pub async fn count_hits(&self, query: &str) -> Result<u64, AppError> {
+        let url = format!("{}/select/logsql/hits", self.base_url);
+        let ctx = OperationContext::doing("log hits query")
+            .with_field("url", url.clone())
+            .with_field("query", query.to_string());
+        let resp = self
+            .client
+            .get(&url)
+            .query(&[("query", query), ("step", "100y")])
+            .send()
+            .await
+            .source_raw_err(
+                AppReason::VlogRequestFailed,
+                "vlog hits query http request failed",
+            )
+            .with_context(&ctx)?;
+        let body = resp
+            .text()
+            .await
+            .source_raw_err(
+                AppReason::VlogRequestFailed,
+                "vlog hits query response body read failed",
+            )
+            .with_context(&ctx)?;
+        let parsed: serde_json::Value = serde_json::from_str(&body)
+            .source_raw_err(AppReason::VlogResponseInvalid, "parse vlog hits response")?;
+        let total = parsed["hits"][0]["total"].as_u64().unwrap_or(0);
+        debug!(total = total, "vlog_repository.count_hits.success");
+        Ok(total)
+    }
+
     /// 解析 VLOG 查询响应：
     /// - 支持 JSON 数组：`[{...}, {...}]`
     /// - 支持多个 JSON 对象拼接：`{...}{...}` 或按换行分隔对象
@@ -124,19 +126,6 @@ impl VlogHttpRepository {
             records.push(record);
         }
         Ok(records)
-    }
-}
-
-#[async_trait]
-impl VlogRepository for VlogHttpRepository {
-    async fn instant_query(&self, query: VlogInstantQuery) -> Result<Vec<VlogRecord>, AppError> {
-        let vlog_query = VlogInstantQuery {
-            query: query.query.clone(),
-            limit: query.limit,
-            start: query.start.with_timezone(&Utc),
-            end: query.end.with_timezone(&Utc),
-        };
-        self.instant_query(&vlog_query).await
     }
 }
 

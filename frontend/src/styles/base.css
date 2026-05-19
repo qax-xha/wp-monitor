@@ -941,12 +941,6 @@ body::before {
   background: rgba(var(--miss-rgb), 0.05);
   padding: 10px;
 }
-.miss-record-head {
-  font-size: 12px;
-  color: var(--miss-text-light);
-  font-family: var(--font-mono);
-  margin-bottom: 6px;
-}
 .miss-record-raw {
   margin: 0;
   font-size: 12px;

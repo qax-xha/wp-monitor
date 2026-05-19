@@ -16,6 +16,10 @@ reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
 async-trait = "0.1"
 toml = "0.8"
 
+memmap2 = "0.9"
+memchr = "2"
+bstr = "1"
+
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 rust-embed = { version = "8.0", features = ["include-exclude"] }
 mime_guess = "2.0"

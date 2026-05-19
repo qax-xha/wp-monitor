@@ -223,6 +223,7 @@ export default function WpMonitorPage() {
   const [missLogs, setMissLogs] = useState<VlogRecord[]>([]);
   const [missHasMore, setMissHasMore] = useState(false);
   const [missPage, setMissPage] = useState(1);
+  const [missIsFileMode, setMissIsFileMode] = useState(false);
   const [missExporting, setMissExporting] = useState(false);
   const [missWindowStart, setMissWindowStart] = useState("");
   const [missWindowEnd, setMissWindowEnd] = useState("");
@@ -793,8 +794,9 @@ export default function WpMonitorPage() {
       setMissLogsError("");
       const data = await fetchMissedLogs(start, end, page, MISS_PAGE_SIZE);
       setMissLogs(data.items);
-      setMissHasMore(data.has_more);
-      setMissPage(data.page);
+      setMissHasMore(data.has_more ?? false);
+      setMissPage(data.page ?? 1);
+      setMissIsFileMode((data as any).source === "file");
       return true;
     } catch (err) {
       setMissLogs([]);
@@ -837,17 +839,19 @@ export default function WpMonitorPage() {
   }
 
   async function onPrevMissPage() {
-    if (missPage <= 1) return;
+    const safePage = missPage ?? 1;
+    if (safePage <= 1) return;
     const pageStart = missWindowStart || detailStartTime;
     const pageEnd = missWindowEnd || detailEndTime;
-    await loadMissedLogs(pageStart, pageEnd, missPage - 1);
+    await loadMissedLogs(pageStart, pageEnd, safePage - 1);
   }
 
   async function onNextMissPage() {
     if (!missHasMore) return;
+    const safePage = missPage ?? 1;
     const pageStart = missWindowStart || detailStartTime;
     const pageEnd = missWindowEnd || detailEndTime;
-    await loadMissedLogs(pageStart, pageEnd, missPage + 1);
+    await loadMissedLogs(pageStart, pageEnd, safePage + 1);
   }
 
   async function openDetail(nodeId: string) {
@@ -893,8 +897,9 @@ export default function WpMonitorPage() {
         ]);
         if (detailRequestSeqRef.current !== seq) return;
         setMissLogs(missedResp.items);
-        setMissHasMore(missedResp.has_more);
-        setMissPage(missedResp.page);
+        setMissHasMore(missedResp.has_more ?? false);
+        setMissPage(missedResp.page ?? 1);
+        setMissIsFileMode((missedResp as any).source === "file");
         setMissLogsError("");
         setMissLogsLoading(false);
         setDetail(detailResp.data);
@@ -1569,8 +1574,7 @@ export default function WpMonitorPage() {
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                     <div className="node__title" style={{ marginBottom: 0 }}>{snapshot.miss.name}</div>
                     <div className="metric-badges" style={{ marginTop: 0 }}>
-                      <span className="metric-badge">速率 {fmtRate(snapshot.miss.metrics.log_rate_eps)}</span>
-                      <span className="metric-badge">数量 {fmtCount(snapshot.miss.metrics.log_count)}</span>
+                      <span className="metric-badge">总量 {fmtCount(snapshot.miss.metrics.log_count)}</span>
                     </div>
                   </div>
                   <div className="node__sub">未命中任何 WPL 规则 · 不流向任何输出</div>
@@ -1779,7 +1783,40 @@ export default function WpMonitorPage() {
           {!drawerError &&
             detailViewMode === "node" &&
             detail && (
-              <>
+              <div className={`detail-grid ${isMissSelected ? "miss-mode" : ""}`}>
+                <section className="panel card detail-col">
+                  <div className="panel-title">基本信息</div>
+                  <div className="detail-name-type-row">
+                    <span
+                      className="detail-kv-value detail-name-only"
+                      title={detail.name}
+                    >
+                      {detail.name}
+                    </span>
+                    <span className="detail-type-badge">{detail.node_type}</span>
+                  </div>
+                  <div className="detail-metric-badges">
+                    {!isMissSelected && (
+                      <span className="detail-metric-badge">
+                        速率 {fmtRate(detail.metrics.log_rate_eps)}
+                      </span>
+                    )}
+                    <span className="detail-metric-badge">
+                      {isMissSelected ? "累计总量 " : "数量 "}
+                      {fmtCount(detail.metrics.log_count)}
+                    </span>
+                  </div>
+                  {!isMissSelected && (
+                    <div className="detail-time-row">
+                      <span className="detail-kv-label">时间窗口</span>
+                      <span className="detail-kv-value detail-time-value">
+                        {formatLocalDateTime(detailStartTime)} -{" "}
+                        {formatLocalDateTime(detailEndTime)}
+                      </span>
+                    </div>
+                  )}
+                </section>
+
                 {!isMissSelected && (
                   <section className="detail-col">
                     <Spin spinning={drawerLoading}>
@@ -1829,39 +1866,41 @@ export default function WpMonitorPage() {
                       !missLogsError &&
                       missLogs.length > 0 && (
                         <>
-                          <p className="miss-page-meta">
-                            第 {missPage} 页 / 每页 10 条
-                            {missHasMore ? "（可继续翻页）" : "（已到末页）"}
-                          </p>
+                          {!missIsFileMode && (
+                            <p className="miss-page-meta">
+                              第 {missPage} 页 / 每页 10 条
+                              {missHasMore ? "（可继续翻页）" : "（已到末页）"}
+                            </p>
+                          )}
                           <div className="miss-scroll">
                             <div className="miss-list">
                               {missPageItems.map((item, index) => {
-                                const offset = (missPage - 1) * MISS_PAGE_SIZE;
+                                const safePage = missPage ?? 1;
+                                const offset = (safePage - 1) * MISS_PAGE_SIZE;
                                 const rowNo = offset + index + 1;
                                 return (
                                   <article
-                                    key={`${item.time}-${item.stream_id}-${rowNo}`}
+                                    key={rowNo}
                                     className="miss-record"
                                   >
-                                    <div className="miss-record-head">
-                                      #{rowNo} | {formatLocalDateTime(item.time)}
-                                    </div>
                                     <pre className="miss-record-raw">
-                                      {item.raw}
+                                      {item.content}
                                     </pre>
                                   </article>
                                 );
                               })}
                             </div>
                           </div>
-                          <div className="miss-pager">
-                            <Button size="small" disabled={missPage <= 1 || missLogsLoading} onClick={() => void onPrevMissPage()}>
-                              上一页
-                            </Button>
-                            <Button size="small" disabled={missLogsLoading || !missHasMore} onClick={() => void onNextMissPage()}>
-                              下一页
-                            </Button>
-                          </div>
+                          {!missIsFileMode && (
+                            <div className="miss-pager">
+                              <Button size="small" disabled={missPage <= 1 || missLogsLoading} onClick={() => void onPrevMissPage()}>
+                                上一页
+                              </Button>
+                              <Button size="small" disabled={missLogsLoading || !missHasMore} onClick={() => void onNextMissPage()}>
+                                下一页
+                              </Button>
+                            </div>
+                          )}
                         </>
                       )}
                   </section>
